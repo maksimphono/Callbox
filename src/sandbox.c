@@ -31,6 +31,7 @@ void init_syscall_rules() {
             insert_Syscall_hashmap(syscalls_map, syscalls_table[i].name, syscalls_table[i].number);
         }
     }
+    return;
 }
 
 void del_syscall_rules() {

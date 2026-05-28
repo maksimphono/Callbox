@@ -17,9 +17,15 @@ void cleanup(char* raw_command){
 }
 
 int main(int argc, char** argv) {
-    init_environment();
+    init_syscall_rules();
 
-    
+    Token_t* tokens = (Token_t*)malloc((argc) * sizeof(Token_t));
+    memcpy(tokens, argv + 1, (argc - 1) * sizeof(char*));
+    tokens[argc - 1] = NULL;
+
+    u_int32_t n = (u_int32_t)argc;
+
+    execute_commands_workflow(tokens, argc - 1);
 
     del_syscall_rules();
 

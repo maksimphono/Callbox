@@ -279,9 +279,10 @@ pid_t start_dummy_leader() {
 }
 
 // Executes full pipeline of commands (series of commands, connected by pipes '|')
-CommandExecutionResult_t* execute_commands_workflow(char** argv) {
+CommandExecutionResult_t* execute_commands_workflow(Token_t* tokens, u_int32_t tokens_length) {
     // it's a pipeline of commands
-    pid_t pids[num_cmds]; // To store all child PIDs for later waiting
+    CommandExecutionResult_t* result = NULL;
+    pid_t pid; // To store all child PIDs for later waiting
 
     // prev_pipe_read_fd holds the file descriptor for the read end of the pipe
     int prev_pipe_read_fd = STDIN_FILENO;
@@ -290,7 +291,7 @@ CommandExecutionResult_t* execute_commands_workflow(char** argv) {
     pid_t group_id = start_dummy_leader();
 
     int pipefd[2];
-    bool is_last = (i >= num_cmds - 1);
+    bool is_last = true;
 
     if (pipe(pipefd) == -1) {
         print_execution_error();
@@ -301,36 +302,22 @@ CommandExecutionResult_t* execute_commands_workflow(char** argv) {
     }
     trace_custom_command(
         tokens, tokens_length, result, 
-        &pids[i], &prev_pipe_read_fd, pipefd,
-        (i < num_cmds - 1), IS_NOT_SINGLE_COMMAND, group_id
+        &pid, &prev_pipe_read_fd, pipefd,
+        false, true, group_id
     );
-    if (pids[i] == -1) {
+    if (pid == -1) {
         if (prev_pipe_read_fd != STDIN_FILENO) 
             close(prev_pipe_read_fd);
         if (not(is_last)) { 
             close(pipefd[0]); 
             close(pipefd[1]); 
-        }
-        break;
+        }        
     }
     if (prev_pipe_read_fd != STDIN_FILENO) {
         close(prev_pipe_read_fd);
     }
 
-    if (not(is_last)) {
-        // Parent closes its copy of the write end (pipefd[1])
-        close(pipefd[1]);
-        // Parent saves its copy of the read end to be the input for the next command
-        prev_pipe_read_fd = pipefd[0];
-    }
-
-    if (prev_pipe_read_fd != STDIN_FILENO) {
-        close(prev_pipe_read_fd); 
-    }
-
-    for (u_int32_t j = 0; j < num_cmds; j++) {
-        wait_child_finish(pids[j]);
-    }
+    wait_child_finish(pid);
 
     if (group_id > 0) {
         int status;
@@ -340,6 +327,6 @@ CommandExecutionResult_t* execute_commands_workflow(char** argv) {
         // Wait for it to be reaped to avoid zombies
         waitpid(group_id, &status, 0); 
     }
-    clean_tokens(commands, num_cmds);
+    //clean_tokens(commands, num_cmds);
     return result;
 }
