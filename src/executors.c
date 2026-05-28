@@ -4,17 +4,18 @@
 Trace_result run_tracer(pid_t pid, pid_t group_id) {
     int status;
     bool in_syscall = false;
+    printf("run_tracer");
 
     // Wait for the child to stop (first stop is right after PTRACE_TRACEME)
     if (waitpid(pid, &status, 0) == -1) {
         return UNKNOWN_ERROR;
     }
 
-        if (ptrace(PTRACE_SETOPTIONS, pid, 0, PTRACE_O_TRACESYSGOOD) == -1) {
+    if (ptrace(PTRACE_SETOPTIONS, pid, 0, PTRACE_O_TRACESYSGOOD) == -1) {
         return UNKNOWN_ERROR;
     }
 
-    while (WIFSTOPPED(status)) {
+    while (WIFSTOPPED(status) || WIFEXITED(status)) {
         struct user_regs_struct regs;
 
         if (ptrace(PTRACE_GETREGS, pid, 0, &regs) == -1) {
@@ -99,7 +100,7 @@ Trace_result run_tracer(pid_t pid, pid_t group_id) {
 }
 
 
-void trace_custom_command(Token_t* tokens, u_int32_t tokens_length, CommandExecutionResult_t* execution_result, int* pid, int* prev_pipe_read_fd, int pipefd[2], bool is_last, bool is_single, pid_t group_id) {
+void trace_custom_command(Token_t* tokens, u_int32_t tokens_length, CommandExecutionResult_t* execution_result, int* pid, int* prev_pipe_read_fd, int pipefd[2], pid_t group_id) {
     *pid = fork(); // creating Tracer process, now Main process will wait for it to finish execution
 
     if (*pid == -1) {
@@ -114,11 +115,6 @@ void trace_custom_command(Token_t* tokens, u_int32_t tokens_length, CommandExecu
             if (setpgid(0, group_id) == -1) { // add tracer to the process group
                 _exit(1);
             }
-        }
-            
-        if (is_single) {
-            pipefd[0] = STDIN_FILENO;
-            pipefd[1] = STDOUT_FILENO;
         }
 
         tracee_pid = fork();
@@ -137,59 +133,34 @@ void trace_custom_command(Token_t* tokens, u_int32_t tokens_length, CommandExecu
             }
 
             if (*prev_pipe_read_fd != STDIN_FILENO) {
-                // Redirect    //  stdin (FD 0) to the read end of the previous pipe
                 if (dup2(*prev_pipe_read_fd, STDIN_FILENO) == -1) {
                     _exit(1);
                 }
-                // Child closes its inherited copy of the previous pipe's read end
                 close(*prev_pipe_read_fd); 
             }
-
-            // If the output needs to go to a pipe
-            if (not(is_single) && is_last) {
-                // Redirect stdout (FD 1) to the write end of the current pipe
-                if (dup2(pipefd[1], STDOUT_FILENO) == -1) {
-                    _exit(1);
-                }
-                
-                close(pipefd[1]); // Close write end (copied to FD 1)
-                close(pipefd[0]); // Close read end (not needed by writer)
-            }
-
-            u_int32_t stdout_targets_num;
-            int* stdout_targets = find_stdout_redirect_targets(tokens, tokens_length, &stdout_targets_num);
-            if (stdout_targets_num > 0 && dup2(stdout_targets[stdout_targets_num - 1], STDOUT_FILENO) == -1) {
+            
+            if (ptrace(PTRACE_TRACEME, 0, 0, 0) == -1) {
                 _exit(1);
             }
-            for (u_int32_t i = 0; i < stdout_targets_num; i++) {
-                close(stdout_targets[i]);
-            }
+            kill(getpid(), SIGSTOP);
 
-            if (is_buildin(tokens[0])) {
-                _exit(0); // don't do anything, exit immediately
-            } else {
-                if (ptrace(PTRACE_TRACEME, 0, 0, 0) == -1) {
+            //printf("qqwerrt\n");
+            if (execvp(tokens[0], tokens) == -1) {
+                /*
+                When execvp() fails I must check if it was due to non-existing command,
+                if it was -> I'm exiting with 127 (command not found), 
+                otherwise just exiting with general error
+                Then let the PARENT handle the error, depending on the exit code
+                */
+                if (errno == ENOENT) {
+                    // desired command wasn't found
+                    _exit(127);
+                } else {
+                    // general error
                     _exit(1);
                 }
-                kill(getpid(), SIGSTOP);
-
-                if (execvp_ignore_redirect(tokens[0], tokens, tokens_length) == -1) {
-                    /*
-                    When execvp() fails I must check if it was due to non-existing command,
-                    if it was -> I'm exiting with 127 (command not found), 
-                    otherwise just exiting with general error
-                    Then let the PARENT handle the error, depending on the exit code
-                    */
-
-                    if (errno == ENOENT) {
-                        // desired command wasn't found
-                        _exit(127);
-                    } else {
-                        // general error
-                        _exit(1);
-                    }
-                }
             }
+            _exit(0);
         } else {
 
             // since the child now owns the necessary FD 0 copy).
@@ -197,11 +168,7 @@ void trace_custom_command(Token_t* tokens, u_int32_t tokens_length, CommandExecu
                 close(*prev_pipe_read_fd);
             }
 
-            if (not(is_single) && is_last) {
-                close(pipefd[1]); 
-                close(pipefd[0]);
-            }
-
+            printf("run_tracer");
             Trace_result tracer_result = run_tracer(tracee_pid, group_id);
             int tracee_status;
 
@@ -285,13 +252,12 @@ CommandExecutionResult_t* execute_commands_workflow(Token_t* tokens, u_int32_t t
     pid_t pid; // To store all child PIDs for later waiting
 
     // prev_pipe_read_fd holds the file descriptor for the read end of the pipe
-    int prev_pipe_read_fd = STDIN_FILENO;
+    int prev_pipe_read_fd = open("ru", O_RDONLY);
 
     // dummy leader of the process group will be used to kill all the processes in the group if necessary
     pid_t group_id = start_dummy_leader();
 
     int pipefd[2];
-    bool is_last = true;
 
     if (pipe(pipefd) == -1) {
         print_execution_error();
@@ -303,19 +269,11 @@ CommandExecutionResult_t* execute_commands_workflow(Token_t* tokens, u_int32_t t
     trace_custom_command(
         tokens, tokens_length, result, 
         &pid, &prev_pipe_read_fd, pipefd,
-        false, true, group_id
+        group_id
     );
-    if (pid == -1) {
-        if (prev_pipe_read_fd != STDIN_FILENO) 
-            close(prev_pipe_read_fd);
-        if (not(is_last)) { 
-            close(pipefd[0]); 
-            close(pipefd[1]); 
-        }        
-    }
-    if (prev_pipe_read_fd != STDIN_FILENO) {
+
+    if (prev_pipe_read_fd != STDIN_FILENO) 
         close(prev_pipe_read_fd);
-    }
 
     wait_child_finish(pid);
 
@@ -324,9 +282,8 @@ CommandExecutionResult_t* execute_commands_workflow(Token_t* tokens, u_int32_t t
         // Use SIGKILL to terminate the sleep process quickly
         if (kill(group_id, SIGKILL) == -1 && errno != ESRCH) {
         }
-        // Wait for it to be reaped to avoid zombies
         waitpid(group_id, &status, 0); 
     }
-    //clean_tokens(commands, num_cmds);
+
     return result;
 }
