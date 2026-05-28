@@ -100,14 +100,17 @@ Trace_result run_tracer(pid_t pid, pid_t group_id) {
 }
 
 
-void trace_custom_command(Token_t* tokens, u_int32_t tokens_length, CommandExecutionResult_t* execution_result, int* pid, int* prev_pipe_read_fd, int pipefd[2], pid_t group_id) {
-    *pid = fork(); // creating Tracer process, now Main process will wait for it to finish execution
+void trace_custom_command(Token_t* tokens, u_int32_t tokens_length, CommandExecutionResult_t* execution_result, pid_t group_id) {
+    pid_t pid = fork(); // creating Tracer process, now Main process will wait for it to finish execution
 
-    if (*pid == -1) {
+    if (pid == -1) {
         return;
     }
 
-    if (IS_CHILD(*pid)) { // TRACER
+    // prev_pipe_read_fd holds the file descriptor for the read end of the pipe
+    int prev_pipe_read_fd = open("ru", O_RDONLY);
+
+    if (IS_CHILD(pid)) { // TRACER
 
         pid_t tracee_pid;
 
@@ -132,11 +135,11 @@ void trace_custom_command(Token_t* tokens, u_int32_t tokens_length, CommandExecu
                 }
             }
 
-            if (*prev_pipe_read_fd != STDIN_FILENO) {
-                if (dup2(*prev_pipe_read_fd, STDIN_FILENO) == -1) {
+            if (prev_pipe_read_fd != STDIN_FILENO) {
+                if (dup2(prev_pipe_read_fd, STDIN_FILENO) == -1) {
                     _exit(1);
                 }
-                close(*prev_pipe_read_fd); 
+                close(prev_pipe_read_fd); 
             }
             
             if (ptrace(PTRACE_TRACEME, 0, 0, 0) == -1) {
@@ -164,8 +167,8 @@ void trace_custom_command(Token_t* tokens, u_int32_t tokens_length, CommandExecu
         } else {
 
             // since the child now owns the necessary FD 0 copy).
-            if (*prev_pipe_read_fd != STDIN_FILENO) {
-                close(*prev_pipe_read_fd);
+            if (prev_pipe_read_fd != STDIN_FILENO) {
+                close(prev_pipe_read_fd);
             }
 
             printf("run_tracer");
@@ -220,8 +223,13 @@ void trace_custom_command(Token_t* tokens, u_int32_t tokens_length, CommandExecu
         }
     } else {
         // MAIN PROCESS
+        wait_child_finish(pid);
+
+        if (prev_pipe_read_fd != STDIN_FILENO) 
+            close(prev_pipe_read_fd);
         return;
     }
+    
 }
 
 pid_t start_dummy_leader() {
@@ -249,33 +257,13 @@ pid_t start_dummy_leader() {
 CommandExecutionResult_t* execute_commands_workflow(Token_t* tokens, u_int32_t tokens_length) {
     // it's a pipeline of commands
     CommandExecutionResult_t* result = NULL;
-    pid_t pid; // To store all child PIDs for later waiting
-
-    // prev_pipe_read_fd holds the file descriptor for the read end of the pipe
-    int prev_pipe_read_fd = open("ru", O_RDONLY);
 
     // dummy leader of the process group will be used to kill all the processes in the group if necessary
     pid_t group_id = start_dummy_leader();
 
-    int pipefd[2];
-
-    if (pipe(pipefd) == -1) {
-        print_execution_error();
-        // Attempt to clean up and continue waiting for launched children
-        //clean_tokens(tokens, tokens_length);
-        //clean_tokens(commands, num_cmds);
-        return result;
-    }
     trace_custom_command(
-        tokens, tokens_length, result, 
-        &pid, &prev_pipe_read_fd, pipefd,
-        group_id
+        tokens, tokens_length, result, group_id
     );
-
-    if (prev_pipe_read_fd != STDIN_FILENO) 
-        close(prev_pipe_read_fd);
-
-    wait_child_finish(pid);
 
     if (group_id > 0) {
         int status;
