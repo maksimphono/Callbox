@@ -2,14 +2,15 @@ cmake_minimum_required(VERSION 3.12)
 project(SyscallBox LANGUAGES C)
 
 add_executable(main
-    buildins.c
-    executors.c
-    print_message.c
-    readers.c
-    sandbox.c
-    utils.c
-    hashmap.c
-    main.c
+    src/buildins.c
+    src/tokenize.c
+    src/executors.c
+    src/print_message.c
+    src/readers.c
+    src/sandbox.c
+    src/utils.c
+    src/hashmap.c
+    src/main.c
 )
 
 # add_subdirectory(lib/tokenize)

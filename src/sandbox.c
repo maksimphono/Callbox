@@ -1,6 +1,6 @@
-#include "sandbox.h"
-#include "hashmap.h"
-#include "syscalls_table.h"
+#include "../include/sandbox.h"
+#include "../include/hashmap.h"
+#include "../include/syscalls_table.h"
 
 Syscall_hashmap_t* syscalls_map;
 Node_recorded_rules_t* syscalls_with_rules = NULL;

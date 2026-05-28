@@ -1,4 +1,4 @@
-#include "readers.h"
+#include "../include/readers.h"
 
 Token_t* read_rules_from_file(Token_t filename) {
     Token_t* rules = NULL;

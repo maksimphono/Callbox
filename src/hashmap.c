@@ -1,4 +1,4 @@
-#include "hashmap.h"
+#include "../include/hashmap.h"
 #include <string.h>
 #include <stdlib.h>
 

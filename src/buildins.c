@@ -1,4 +1,4 @@
-#include "buildins.h"
+#include "../include/buildins.h"
 
 bool is_buildin(char* cmd){
     return find_buildin_handler(cmd) != NULL;

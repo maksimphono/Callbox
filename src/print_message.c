@@ -1,4 +1,4 @@
-#include "print_message.h"
+#include "../include/print_message.h"
 
 void print_prompt() {
     printf("esh > ");

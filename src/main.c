@@ -1,12 +1,12 @@
-#include "defs.h"
-#include "buildins.h"
-#include "executors.h"
-#include "print_message.h"
-#include "readers.h"
-#include "sandbox.h"
-#include "tokenize.h"
-#include "utils.h"
-#include "hashmap.h"
+#include "../include/defs.h"
+#include "../include/buildins.h"
+#include "../include/executors.h"
+#include "../include/print_message.h"
+#include "../include/readers.h"
+#include "../include/sandbox.h"
+#include "../include/tokenize.h"
+#include "../include/utils.h"
+#include "../include/hashmap.h"
 
 global_state_t global_state;
 

@@ -1,5 +1,5 @@
-#include "utils.h"
-#include "buildins.h"
+#include "../include/utils.h"
+#include "../include/buildins.h"
 
 int check_regex(char* str, const char* pattern) {
     regex_t regex;
