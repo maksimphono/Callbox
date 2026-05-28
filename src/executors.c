@@ -1,15 +1,5 @@
 #include "../include/executors.h"
 
-void execute_buildin_command(Token_t* tokens, u_int32_t tokens_length, CommandExecutionResult_t* execution_result) {
-    Handler_fn handler = find_buildin_handler(tokens[0]);
-
-    if (handler == NULL) {
-        print_command_not_found();
-    }
-
-    handler(tokens, tokens_length);
-}
-
 // TODO: refactor this
 Trace_result run_tracer(pid_t pid, pid_t group_id) {
     int status;
@@ -108,99 +98,6 @@ Trace_result run_tracer(pid_t pid, pid_t group_id) {
     return SUCCESS;
 }
 
-// Executes custom (non-buildin) command from executable file
-void execute_custom_command(Token_t* tokens, u_int32_t tokens_length, CommandExecutionResult_t* execution_result, int* pid, int* prev_pipe_read_fd, bool is_last, bool is_single, pid_t group_id){
-    int pipefd[2];
-
-    if (is_single) {
-        pipefd[0] = STDIN_FILENO;
-        pipefd[1] = STDOUT_FILENO;
-    }
-
-    if (not(is_single) && is_last) {
-        if (pipe(pipefd) == -1) {
-            print_execution_error();
-            // Attempt to clean up and continue waiting for launched children
-            exit(1);
-        }
-    }
-    *pid = fork();
-
-    if (*pid == -1) {
-        print_execution_error();
-        // Clean up resources and exit loop
-        exit(1);
-    }
-
-    if (IS_CHILD(*pid)) {
-        if (group_id > 0) {
-            if (setpgid(0, group_id) == -1) { // add child process to the process group
-                _exit(1);
-            }
-        }
-
-        if (*prev_pipe_read_fd != STDIN_FILENO) {
-            // Redirect    //  stdin (FD 0) to the read end of the previous pipe
-            if (dup2(*prev_pipe_read_fd, STDIN_FILENO) == -1) {
-                _exit(1);
-            }
-            // Child closes its inherited copy of the previous pipe's read end
-            close(*prev_pipe_read_fd); 
-        }
-
-        // If the output needs to go to a pipe
-        if (not(is_single) && is_last) {
-            // Redirect stdout (FD 1) to the write end of the current pipe
-            if (dup2(pipefd[1], STDOUT_FILENO) == -1) {
-                _exit(1);
-            }
-            // Child closes its inherited copies of the current pipe's FDs
-            close(pipefd[1]); // Close write end (copied to FD 1)
-            close(pipefd[0]); // Close read end (not needed by writer)
-        }
-
-        u_int32_t stdout_targets_num;
-        int* stdout_targets = find_stdout_redirect_targets(tokens, tokens_length, &stdout_targets_num);
-        if (stdout_targets_num > 0 && dup2(stdout_targets[stdout_targets_num - 1], STDOUT_FILENO) == -1) {
-            _exit(1);
-        }
-        for (u_int32_t i = 0; i < stdout_targets_num; i++) {
-            close(stdout_targets[i]);
-        }
-
-        if (is_buildin(tokens[0])) {
-            _exit(0); // don't do anything, exit immediately
-        } else {
-            if (execvp_ignore_redirect(tokens[0], tokens, tokens_length) == -1) {
-                /*
-                When execvp() fails I must check if it was due to non-existing command,
-                if it was -> I'm exiting with 127 (command not found), 
-                otherwise just exiting with general error
-                Then let the PARENT handle the error, depending on the exit code
-                */
-
-                if (errno == ENOENT) {
-                    // desired command wasn't found
-                    _exit(127);
-                } else {
-                    // general error
-                    _exit(1);
-                }
-            }
-        }
-    } else {
-
-        // since the child now owns the necessary FD 0 copy).
-        if (*prev_pipe_read_fd != STDIN_FILENO) {
-            close(*prev_pipe_read_fd);
-        }
-        if (not(is_single) && is_last) {
-            close(pipefd[1]);
-            // Store the read end for the next iteration's input
-            *prev_pipe_read_fd = pipefd[0];
-        }
-    }
-}
 
 void trace_custom_command(Token_t* tokens, u_int32_t tokens_length, CommandExecutionResult_t* execution_result, int* pid, int* prev_pipe_read_fd, int pipefd[2], bool is_last, bool is_single, pid_t group_id) {
     *pid = fork(); // creating Tracer process, now Main process will wait for it to finish execution
@@ -218,7 +115,6 @@ void trace_custom_command(Token_t* tokens, u_int32_t tokens_length, CommandExecu
                 _exit(1);
             }
         }
-            //write_to_terminal("Tracer\n");
             
         if (is_single) {
             pipefd[0] = STDIN_FILENO;
@@ -361,47 +257,6 @@ void trace_custom_command(Token_t* tokens, u_int32_t tokens_length, CommandExecu
     }
 }
 
-// Executes single command, that is not part of the pipeline
-CommandExecutionResult_t* execute_single_command(char* command, CommandExecutionResult_t* execution_result) {
-    u_int32_t tokens_length;
-    Token_t* tokens = tokenize_with_strings(command, &tokens_length, PSEUDO_SP);
-
-    for (u_int32_t i = 0; i < tokens_length; i++) {
-        if (replace_esc_seq(tokens[i]) == NULL) {
-            clean_tokens(tokens, tokens_length);
-            return NULL;
-        }
-    }
-
-    if (is_buildin(tokens[0])) {
-        execute_buildin_command(tokens, tokens_length, execution_result);
-    } else {
-        int pid;
-        int prev_pipe_read_fd = STDIN_FILENO;
-        bool syscall_was_blocked = false;
-
-        if (global_state.mode == SANDBOX) {
-            int pipefd[2];
-            trace_custom_command(
-                tokens, tokens_length, execution_result, 
-                &pid, &prev_pipe_read_fd, pipefd,
-                true, IS_SINGLE_COMMAND, 0
-            );
-        } else{
-            execute_custom_command(
-                tokens, tokens_length, execution_result, 
-                &pid, &prev_pipe_read_fd, 
-                true, IS_SINGLE_COMMAND, 0
-            );
-        }
-
-        wait_child_finish(pid);
-    }
-    clean_tokens(tokens, tokens_length);
-
-    return execution_result;
-}
-
 pid_t start_dummy_leader() {
     pid_t pid = fork();
     
@@ -424,34 +279,7 @@ pid_t start_dummy_leader() {
 }
 
 // Executes full pipeline of commands (series of commands, connected by pipes '|')
-CommandExecutionResult_t* execute_commands_workflow(char* _raw_command, CommandExecutionResult_t* result) {
-    u_int32_t num_cmds;
-    Token_t* commands;
-    u_int32_t i;
-    u_int32_t len = 0;
-    char* raw_command = _raw_command;
-
-    raw_command = detect_sandbox(_raw_command);
-    if (raw_command == NULL) {
-        print_invalid_syntax();
-        return result;
-    }
-
-    commands = tokenize_with_strings(raw_command, &num_cmds, PSEUDO_PIPE);
-    
-    if (num_cmds == 0 || commands == NULL) {
-        print_invalid_syntax();
-        clean_tokens(commands, num_cmds);
-        return result;
-    }
-
-    if (num_cmds == 1) {
-        // it's a single command
-        execute_single_command(raw_command, result);
-        clean_tokens(commands, num_cmds);
-        return result;
-    }
-
+CommandExecutionResult_t* execute_commands_workflow(char** argv) {
     // it's a pipeline of commands
     pid_t pids[num_cmds]; // To store all child PIDs for later waiting
 
@@ -461,63 +289,39 @@ CommandExecutionResult_t* execute_commands_workflow(char* _raw_command, CommandE
     // dummy leader of the process group will be used to kill all the processes in the group if necessary
     pid_t group_id = start_dummy_leader();
 
-    for (i = 0; i < num_cmds; i++) {
-        u_int32_t tokens_length;
-        Token_t* tokens = tokenize_with_strings(commands[i], &tokens_length, PSEUDO_SP);
+    int pipefd[2];
+    bool is_last = (i >= num_cmds - 1);
 
-        for (u_int32_t i = 0; i < tokens_length; i++) {
-            if (replace_esc_seq(tokens[i]) == NULL) {
-                // invalid esc sequence
-                clean_tokens(tokens, tokens_length);
-                clean_tokens(commands, num_cmds);
-                return result;
-            }
+    if (pipe(pipefd) == -1) {
+        print_execution_error();
+        // Attempt to clean up and continue waiting for launched children
+        //clean_tokens(tokens, tokens_length);
+        //clean_tokens(commands, num_cmds);
+        return result;
+    }
+    trace_custom_command(
+        tokens, tokens_length, result, 
+        &pids[i], &prev_pipe_read_fd, pipefd,
+        (i < num_cmds - 1), IS_NOT_SINGLE_COMMAND, group_id
+    );
+    if (pids[i] == -1) {
+        if (prev_pipe_read_fd != STDIN_FILENO) 
+            close(prev_pipe_read_fd);
+        if (not(is_last)) { 
+            close(pipefd[0]); 
+            close(pipefd[1]); 
         }
+        break;
+    }
+    if (prev_pipe_read_fd != STDIN_FILENO) {
+        close(prev_pipe_read_fd);
+    }
 
-        if (global_state.mode == SANDBOX) {
-            int pipefd[2];
-            bool is_last = (i >= num_cmds - 1);
-
-            if (not(is_last)) {
-                if (pipe(pipefd) == -1) {
-                    print_execution_error();
-                    // Attempt to clean up and continue waiting for launched children
-                    clean_tokens(tokens, tokens_length);
-                    clean_tokens(commands, num_cmds);
-                    return result;
-                }
-            }
-            trace_custom_command(
-                tokens, tokens_length, result, 
-                &pids[i], &prev_pipe_read_fd, pipefd,
-                (i < num_cmds - 1), IS_NOT_SINGLE_COMMAND, group_id
-            );
-            if (pids[i] == -1) {
-                if (prev_pipe_read_fd != STDIN_FILENO) 
-                    close(prev_pipe_read_fd);
-                if (not(is_last)) { 
-                    close(pipefd[0]); 
-                    close(pipefd[1]); 
-                }
-                break;
-            }
-            if (prev_pipe_read_fd != STDIN_FILENO) {
-                close(prev_pipe_read_fd);
-            }
-
-            if (not(is_last)) {
-                // Parent closes its copy of the write end (pipefd[1])
-                close(pipefd[1]);
-                // Parent saves its copy of the read end to be the input for the next command
-                prev_pipe_read_fd = pipefd[0];
-            }
-        } else
-            execute_custom_command(
-                tokens, tokens_length, result, 
-                &pids[i], &prev_pipe_read_fd, 
-                (i < num_cmds - 1), IS_NOT_SINGLE_COMMAND, 0
-            );
-        clean_tokens(tokens, tokens_length);
+    if (not(is_last)) {
+        // Parent closes its copy of the write end (pipefd[1])
+        close(pipefd[1]);
+        // Parent saves its copy of the read end to be the input for the next command
+        prev_pipe_read_fd = pipefd[0];
     }
 
     if (prev_pipe_read_fd != STDIN_FILENO) {
