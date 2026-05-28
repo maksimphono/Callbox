@@ -3,7 +3,6 @@ project(SyscallBox LANGUAGES C)
 
 add_executable(main
     src/buildins.c
-    src/tokenize.c
     src/executors.c
     src/print_message.c
     src/readers.c
@@ -13,6 +12,6 @@ add_executable(main
     src/main.c
 )
 
-# add_subdirectory(lib/tokenize)
+add_subdirectory(lib/tokenize)
 
-# target_link_libraries(esh tokenize)
+target_link_libraries(main tokenize)

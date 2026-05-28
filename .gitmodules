@@ -1,0 +1,3 @@
+[submodule "lib/tokenize"]
+	path = lib/tokenize
+	url = https://github.com/maksimphono/libtokenize.git
