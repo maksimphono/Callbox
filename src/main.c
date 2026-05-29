@@ -7,17 +7,20 @@
 #include "../include/utils.h"
 #include "../include/hashmap.h"
 
+Token_t* prepare_tokens(int argc, char** argv){
+    Token_t* tokens = (Token_t*)malloc((argc) * sizeof(Token_t));
+    memcpy(tokens, argv + 1, (argc - 1) * sizeof(char*));
+    tokens[argc - 1] = NULL;
+    return tokens;
+}
+
 
 int main(int argc, char** argv) {
     init_syscall_rules();
 
-    Token_t* tokens = (Token_t*)malloc((argc) * sizeof(Token_t));
-    memcpy(tokens, argv + 1, (argc - 1) * sizeof(char*));
-    tokens[argc - 1] = NULL;
+    Token_t* tokens = prepare_tokens(argc, argv);
 
-    u_int32_t tokens_length = (u_int32_t)argc - 1;
-
-    execute_commands_workflow(tokens, tokens_length);
+    execute_commands_workflow(tokens, (u_int32_t)argc - 1);
 
     free(tokens);
 
