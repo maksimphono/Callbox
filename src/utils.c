@@ -1,5 +1,4 @@
 #include "../include/utils.h"
-#include "../include/buildins.h"
 
 int check_regex(char* str, const char* pattern) {
     regex_t regex;
@@ -81,46 +80,6 @@ char* replace_esc_seq(Token_t token) {
 
 char *strcpy_with_esc(char *dest, const char *src) {
     return strncpy_with_esc(dest, src, __UINT64_MAX__);
-}
-
-char* detect_sandbox(char* _raw_command) {
-    u_int32_t len;
-    char* raw_command = _raw_command;
-
-    Token_t* tokens = tokenize_limit(_raw_command, &len, PSEUDO_SP, 2);
-    if (strcmp(tokens[0], KEYWORD_SANDBOX) == 0) {
-        // first instruction perris a "sandbox"
-
-        if (len < 2) {
-            clean_tokens(tokens, len);
-            return NULL;
-        }
-        raw_command = _raw_command + strlen(tokens[0]) + strlen(tokens[1]) + 2;
-
-        handle_buildin_sandbox(tokens, len);
-    }
-
-    clean_tokens(tokens, len);
-
-    return raw_command;
-}
-// Same as regular 'execvp', but ignores all stdout redirections
-int execvp_ignore_redirect(Token_t command, Token_t* tokens, u_int32_t tokens_length){
-    u_int32_t length = 0;
-    Token_t* tokens_without_redirect = (Token_t*)malloc((tokens_length + 1) * sizeof(Token_t));
-    int result = 0;
-
-    for (u_int32_t i = 0; tokens[i] != NULL; i++) {
-        if (IS_NOT_STDOUT_REDIRECTION(tokens[i])) {
-            tokens_without_redirect[length++] = tokens[i];
-        }
-    }
-    tokens_without_redirect[length] = NULL;
-
-    result = execvp(tokens_without_redirect[0], tokens_without_redirect);
-    free(tokens_without_redirect);
-
-    return result;
 }
 
 // Waits for child process to finish execution, analyzes exit code

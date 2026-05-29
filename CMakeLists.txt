@@ -2,7 +2,6 @@ cmake_minimum_required(VERSION 3.12)
 project(SyscallBox LANGUAGES C)
 
 add_executable(main
-    src/buildins.c
     src/executors.c
     src/print_message.c
     src/readers.c

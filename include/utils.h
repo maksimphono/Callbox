@@ -83,8 +83,6 @@ char *strcpy_with_esc(char *dest, const char *src);
 
 char* replace_esc_seq(Token_t token);
 
-char* detect_sandbox(char* _raw_command);
-
 // Waits for child process to finish execution, analyzes exit code
 // and print corresponding error message if necessary
 void wait_child_finish(int pid);

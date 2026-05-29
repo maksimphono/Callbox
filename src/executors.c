@@ -1,6 +1,5 @@
 #include "../include/executors.h"
 
-// TODO: refactor this
 Trace_result run_tracer(pid_t pid, pid_t group_id) {
     int status;
     bool in_syscall = false;
@@ -11,16 +10,12 @@ Trace_result run_tracer(pid_t pid, pid_t group_id) {
         return UNKNOWN_ERROR;
     }
 
-    if (ptrace(PTRACE_SETOPTIONS, pid, 0, PTRACE_O_TRACESYSGOOD) == -1) {
-        return UNKNOWN_ERROR;
-    }
+    ptrace_or_error(PTRACE_SETOPTIONS, pid, 0, PTRACE_O_TRACESYSGOOD);
 
     while (WIFSTOPPED(status) || WIFEXITED(status)) {
         struct user_regs_struct regs;
 
-        if (ptrace(PTRACE_GETREGS, pid, 0, &regs) == -1) {
-            return UNKNOWN_ERROR;
-        }
+        ptrace_or_error(PTRACE_GETREGS, pid, 0, &regs);
 
         if (WIFSTOPPED(status) && (WSTOPSIG(status) & 0x80)) {
             if (not(in_syscall)) {
@@ -45,21 +40,15 @@ Trace_result run_tracer(pid_t pid, pid_t group_id) {
                         regs.orig_rax = 231;
                         regs.rdi = 1;
 
-                        if (ptrace(PTRACE_SETREGS, pid, 0, &regs) == -1) {
-                            return UNKNOWN_ERROR;
-                        }
+                        ptrace_or_error(PTRACE_SETREGS, pid, 0, &regs);
 
-                        if (ptrace(PTRACE_CONT, pid, 0, 0) == -1) {
-                            return UNKNOWN_ERROR;
-                        }
+                        ptrace_or_error(PTRACE_CONT, pid, 0, 0);
 
                         return BLOCKED_SYSCALL;
                     } else if (required_action == FILTER) {
                         // first stage of filtering: on syscall enter change it's number, make kernel skip it's execution
                         regs.orig_rax = -1;
-                        if (ptrace(PTRACE_SETREGS, pid, 0, &regs) == -1) {
-                            return UNKNOWN_ERROR;
-                        }
+                        ptrace_or_error(PTRACE_SETREGS, pid, 0, &regs);
 
                         is_filtered = true;
                     }
@@ -73,9 +62,7 @@ Trace_result run_tracer(pid_t pid, pid_t group_id) {
                 if (is_filtered) {
                     // second stage of filtering: on syscall exit make it look like syscall execution returns access error
                     regs.rax = -EACCES;
-                    if (ptrace(PTRACE_SETREGS, pid, 0, &regs) == -1) {
-                        return UNKNOWN_ERROR;
-                    }
+                    ptrace_or_error(PTRACE_SETREGS, pid, 0, &regs);
 
                     is_filtered = false;
                 }

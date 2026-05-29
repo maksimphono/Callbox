@@ -4,11 +4,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 
-void print_prompt();
-
 void print_invalid_syntax();
-
-void print_command_not_found();
 
 void print_execution_error();
 

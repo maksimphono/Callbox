@@ -8,13 +8,15 @@
 #include "defs.h"
 #include "tokenize.h"
 #include "sandbox.h"
+#include "readers.h"
 #include "utils.h"
-#include "buildins.h"
 
 typedef struct {
     bool global_error;
     int exit_code;
 } CommandExecutionResult_t;
+
+#define ptrace_or_error(cmd, a, b, mode) if (ptrace(cmd, a, b, mode) == -1) { return UNKNOWN_ERROR; }
 
 Trace_result run_tracer(pid_t pid, pid_t group_id);
 // Executes custom (non-buildin) command from executable file
