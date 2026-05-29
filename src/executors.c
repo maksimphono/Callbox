@@ -107,7 +107,7 @@ int trace_custom_command(Token_t* tokens, u_int32_t tokens_length, CommandExecut
     if (IS_CHILD(tracee_pid)) { // TRACEE
         if (group_id > 0) {
             if (setpgid(0, group_id) == -1) { // add child process to the process group
-                   _exit(UNKNOWN_ERROR);
+                _exit(UNKNOWN_ERROR);
             }
         }
 
