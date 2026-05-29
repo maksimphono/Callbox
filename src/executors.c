@@ -32,8 +32,8 @@ Trace_result run_tracer(pid_t pid, pid_t group_id) {
                                 // Fallback to exit_group on the tracee if group kill fails (unlikely)
                                 regs.orig_rax = 231; regs.rdi = 2;
                                 ptrace(PTRACE_SETREGS, pid, 0, &regs);
-                                ptrace(PTRACE_CONT, pid, 0, 0);
                             }
+                            ptrace_or_error(PTRACE_CONT, pid, 0, 0);
 
                             return BLOCKED_SYSCALL;
                         }
@@ -87,29 +87,18 @@ Trace_result run_tracer(pid_t pid, pid_t group_id) {
 }
 
 
-int trace_custom_command(Token_t* tokens, u_int32_t tokens_length, CommandExecutionResult_t* execution_result, int prev_pipe_read_fd, pid_t group_id) {
+int trace_custom_command(Token_t* tokens, u_int32_t tokens_length, CommandExecutionResult_t* execution_result, int prev_pipe_read_fd) {
     pid_t tracee_pid;
-
-    if (group_id > 0){
-        if (setpgid(0, group_id) == -1) { // add tracer to the process group
-            return (1);
-        }
-    }
 
     tracee_pid = fork();
 
     if (tracee_pid == -1) {
         print_execution_error();
-        // Clean up resources and exit loop
         exit(1);
     }
 
     if (IS_CHILD(tracee_pid)) { // TRACEE
-        if (group_id > 0) {
-            if (setpgid(0, group_id) == -1) { // add child process to the process group
-                _exit(UNKNOWN_ERROR);
-            }
-        }
+        setpgid(0, 0);
 
         if (prev_pipe_read_fd != STDIN_FILENO) {
             if (dup2(prev_pipe_read_fd, STDIN_FILENO) == -1) {
@@ -146,7 +135,7 @@ int trace_custom_command(Token_t* tokens, u_int32_t tokens_length, CommandExecut
             close(prev_pipe_read_fd);
         }
 
-        Trace_result tracer_result = run_tracer(tracee_pid, group_id);
+        Trace_result tracer_result = run_tracer(tracee_pid, tracee_pid);
         int tracee_status;
 
         waitpid(tracee_pid, &tracee_status, 0);
@@ -175,26 +164,6 @@ int trace_custom_command(Token_t* tokens, u_int32_t tokens_length, CommandExecut
     return UNKNOWN_ERROR;
 }
 
-pid_t start_dummy_leader() {
-    pid_t pid = fork();
-    
-    if (pid == -1) {
-        return -1;
-    }
-
-    if (pid == 0) {
-        if (setpgid(0, 0) == -1) {
-            _exit(1);
-        }
-        for (int fd = 0; fd < 3; fd++) close(fd);
-        char *cmd[] = {"sleep", "9999999", NULL}; 
-        if (execvp(cmd[0], cmd) == -1) {
-            _exit(127);
-        }
-    }
-    
-    return pid;
-}
 
 // Executes full pipeline of commands (series of commands, connected by pipes '|')
 CommandExecutionResult_t* execute_commands_workflow(Token_t* tokens, u_int32_t tokens_length) {
@@ -204,21 +173,20 @@ CommandExecutionResult_t* execute_commands_workflow(Token_t* tokens, u_int32_t t
     int prev_pipe_read_fd = open("inp", O_RDONLY);
 
     // dummy leader of the process group will be used to kill all the processes in the group if necessary
-    pid_t group_id = start_dummy_leader();
 
     read_rules_from_file("ru");
 
     int trace_result = trace_custom_command(
-        tokens, tokens_length, result, prev_pipe_read_fd, group_id
+        tokens, tokens_length, result, prev_pipe_read_fd
     );
 
-    if (group_id > 0) {
-        int status;
-        // Use SIGKILL to terminate the sleep process quickly
-        if (kill(group_id, SIGKILL) == -1 && errno != ESRCH) {
-        }
-        waitpid(group_id, &status, 0); 
-    }
+    //if (group_id > 0) {
+    //    int status;
+    //    // Use SIGKILL to terminate the sleep process quickly
+    //    if (kill(group_id, SIGKILL) == -1 && errno != ESRCH) {
+    //    }
+    //    waitpid(group_id, &status, 0); 
+    //}
 
     return result;
 }
