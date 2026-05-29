@@ -4,7 +4,6 @@
 Trace_result run_tracer(pid_t pid, pid_t group_id) {
     int status;
     bool in_syscall = false;
-    printf("run_tracer");
 
     // Wait for the child to stop (first stop is right after PTRACE_TRACEME)
     if (waitpid(pid, &status, 0) == -1) {
@@ -22,7 +21,8 @@ Trace_result run_tracer(pid_t pid, pid_t group_id) {
             return UNKNOWN_ERROR;
         }
 
-        if (WSTOPSIG(status) & 0x80 || not(in_syscall)) {
+        if (WIFSTOPPED(status) && (WSTOPSIG(status) & 0x80)) {
+            if (not(in_syscall)) {
             reg_t syscall_num = regs.orig_rax; // Syscall number is stored in orig_rax (x86_64)
 
             if (get_rules_for_syscall_id(syscall_num) != NULL){
@@ -67,26 +67,24 @@ Trace_result run_tracer(pid_t pid, pid_t group_id) {
 
                     return FILTERED_SYSCALL;
                 } else if (required_action == NOTIFY) {
-                    if (ptrace(PTRACE_SETREGS, pid, 0, &regs) == -1) {
-                        return UNKNOWN_ERROR;
-                    }
-                    if (ptrace(PTRACE_CONT, pid, 0, 0) == -1) {
-                        return UNKNOWN_ERROR;
-                    }
-                    return NOTIFIED_SYSCALL;
+                    printf("notify\n");
+                    fflush(stdout);
                 }
             }
-            in_syscall = true; 
-        }
-        else {
+            in_syscall = true;
+
+            }
+            else {
             long return_value = regs.rax;
             in_syscall = false; 
-        }
+            }
         // Resume execution and wait for the next syscall stop
+        }
         if (ptrace(PTRACE_SYSCALL, pid, 0, 0) == -1) {
             break; 
         }
         // Wait for the tracee to stop again (either due to syscall or termination)
+
         if (waitpid(pid, &status, 0) == -1) {
             return UNKNOWN_ERROR;
         }
@@ -100,23 +98,25 @@ Trace_result run_tracer(pid_t pid, pid_t group_id) {
 }
 
 
-void trace_custom_command(Token_t* tokens, u_int32_t tokens_length, CommandExecutionResult_t* execution_result, pid_t group_id) {
-    pid_t pid = fork(); // creating Tracer process, now Main process will wait for it to finish execution
+Trace_result trace_custom_command(Token_t* tokens, u_int32_t tokens_length, CommandExecutionResult_t* execution_result, pid_t group_id) {
+    //pid_t pid = fork(); // creating Tracer process, now Main process will wait for it to finish execution
 
-    if (pid == -1) {
-        return;
-    }
+    //if (pid == -1) {
+    //    return;
+    //}
+
+    read_rules_from_file("ru");
 
     // prev_pipe_read_fd holds the file descriptor for the read end of the pipe
-    int prev_pipe_read_fd = open("ru", O_RDONLY);
+    int prev_pipe_read_fd = open("inp", O_RDONLY);
 
-    if (IS_CHILD(pid)) { // TRACER
+    if (1) { // TRACER
 
         pid_t tracee_pid;
 
         if (group_id > 0){
             if (setpgid(0, group_id) == -1) { // add tracer to the process group
-                _exit(1);
+                return (1);
             }
         }
 
@@ -131,19 +131,19 @@ void trace_custom_command(Token_t* tokens, u_int32_t tokens_length, CommandExecu
         if (IS_CHILD(tracee_pid)) { // TRACEE
             if (group_id > 0) {
                 if (setpgid(0, group_id) == -1) { // add child process to the process group
-                       _exit(1);
+                       _exit(UNKNOWN_ERROR);
                 }
             }
 
             if (prev_pipe_read_fd != STDIN_FILENO) {
                 if (dup2(prev_pipe_read_fd, STDIN_FILENO) == -1) {
-                    _exit(1);
+                    _exit(UNKNOWN_ERROR);
                 }
                 close(prev_pipe_read_fd); 
             }
             
             if (ptrace(PTRACE_TRACEME, 0, 0, 0) == -1) {
-                _exit(1);
+                _exit(UNKNOWN_ERROR);
             }
             kill(getpid(), SIGSTOP);
 
@@ -160,10 +160,10 @@ void trace_custom_command(Token_t* tokens, u_int32_t tokens_length, CommandExecu
                     _exit(127);
                 } else {
                     // general error
-                    _exit(1);
+                    _exit(UNKNOWN_ERROR);
                 }
             }
-            _exit(0);
+            _exit(SUCCESS);
         } else {
 
             // since the child now owns the necessary FD 0 copy).
@@ -171,65 +171,57 @@ void trace_custom_command(Token_t* tokens, u_int32_t tokens_length, CommandExecu
                 close(prev_pipe_read_fd);
             }
 
-            printf("run_tracer");
             Trace_result tracer_result = run_tracer(tracee_pid, group_id);
             int tracee_status;
 
             waitpid(tracee_pid, &tracee_status, 0);
 
             if (tracer_result == SUCCESS) {
-                _exit(SUCCESS);
+                return (SUCCESS);
             }
             else if (tracer_result == BLOCKED_SYSCALL) {
-                _exit(SUCCESS);
-            }
-            else if (tracer_result == NOTIFIED_SYSCALL) {
-                _exit(SUCCESS);
+                return (SUCCESS);
             }
             else if (tracer_result == FILTERED_SYSCALL) {
                 // must get all the registers again to reset them
                 struct user_regs_struct regs;
 
                 if (ptrace(PTRACE_GETREGS, tracee_pid, 0, &regs) == -1) {
-                    _exit(UNKNOWN_ERROR);
+                    return (UNKNOWN_ERROR);
                 }
                 // notify about access error in kernel (just to have something to return)
                 regs.rax = -EACCES;
                 if (ptrace(PTRACE_SETREGS, tracee_pid, 0, &regs) == -1) {
-                    _exit(UNKNOWN_ERROR);
+                    return (UNKNOWN_ERROR);
                 }
                 if (ptrace(PTRACE_CONT, tracee_pid, 0, 0) == -1) {
-                    _exit(UNKNOWN_ERROR);
+                    return (UNKNOWN_ERROR);
                 }
 
-                _exit(SUCCESS);
+                return (SUCCESS);
             }
             if (tracer_result != SUCCESS && WIFEXITED(tracee_status)) {
                 // Tracing ended, and Tracee exited normally (status 0-255) -> just exit with this status
-                _exit(WEXITSTATUS(tracee_status));
+                return (WEXITSTATUS(tracee_status));
             } else if (WIFSIGNALED(tracee_status)) {
                 // tracee was terminated (for example by syscall block)
                 int term_sig = WTERMSIG(tracee_status);
                 if (tracer_result == SUCCESS) {
-                    _exit(SUCCESS);
+                    return (SUCCESS);
                 } else {
-                    _exit(128 + term_sig); 
+                    return (128 + term_sig); 
                 }
             } else {
                 // Fallback for unexpected status (e.g., still stopped).
-                _exit(UNKNOWN_ERROR); 
+                return (UNKNOWN_ERROR); 
             }
-            _exit(tracer_result);
+            return (tracer_result);
         }
-    } else {
-        // MAIN PROCESS
-        wait_child_finish(pid);
-
-        if (prev_pipe_read_fd != STDIN_FILENO) 
-            close(prev_pipe_read_fd);
-        return;
     }
-    
+    // MAIN PROCESS
+    //wait_child_finish(pid);
+
+    return UNKNOWN_ERROR;
 }
 
 pid_t start_dummy_leader() {
@@ -261,7 +253,7 @@ CommandExecutionResult_t* execute_commands_workflow(Token_t* tokens, u_int32_t t
     // dummy leader of the process group will be used to kill all the processes in the group if necessary
     pid_t group_id = start_dummy_leader();
 
-    trace_custom_command(
+    Trace_result trace_result = trace_custom_command(
         tokens, tokens_length, result, group_id
     );
 
