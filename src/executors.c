@@ -62,9 +62,6 @@ Trace_result run_tracer(pid_t pid, pid_t group_id) {
                         }
 
                         is_filtered = true;
-                    } else if (required_action == NOTIFY) {
-                        printf("notify\n");
-                        fflush(stdout);
                     }
                 }
                 in_syscall = true;
@@ -103,7 +100,7 @@ Trace_result run_tracer(pid_t pid, pid_t group_id) {
 }
 
 
-Trace_result trace_custom_command(Token_t* tokens, u_int32_t tokens_length, CommandExecutionResult_t* execution_result, pid_t group_id) {
+int trace_custom_command(Token_t* tokens, u_int32_t tokens_length, CommandExecutionResult_t* execution_result, pid_t group_id) {
     //pid_t pid = fork(); // creating Tracer process, now Main process will wait for it to finish execution
 
     //if (pid == -1) {
@@ -152,7 +149,6 @@ Trace_result trace_custom_command(Token_t* tokens, u_int32_t tokens_length, Comm
             }
             kill(getpid(), SIGSTOP);
 
-            //printf("qqwerrt\n");
             if (execvp(tokens[0], tokens) == -1) {
                 /*
                 When execvp() fails I must check if it was due to non-existing command,
@@ -185,24 +181,6 @@ Trace_result trace_custom_command(Token_t* tokens, u_int32_t tokens_length, Comm
                 return (SUCCESS);
             }
             else if (tracer_result == BLOCKED_SYSCALL) {
-                return (SUCCESS);
-            }
-            else if (tracer_result == FILTERED_SYSCALL) {
-                // must get all the registers again to reset them
-                struct user_regs_struct regs;
-
-                if (ptrace(PTRACE_GETREGS, tracee_pid, 0, &regs) == -1) {
-                    return (UNKNOWN_ERROR);
-                }
-                // notify about access error in kernel (just to have something to return)
-                regs.rax = -EACCES;
-                if (ptrace(PTRACE_SETREGS, tracee_pid, 0, &regs) == -1) {
-                    return (UNKNOWN_ERROR);
-                }
-                if (ptrace(PTRACE_CONT, tracee_pid, 0, 0) == -1) {
-                    return (UNKNOWN_ERROR);
-                }
-
                 return (SUCCESS);
             }
             if (tracer_result != SUCCESS && WIFEXITED(tracee_status)) {
@@ -258,7 +236,7 @@ CommandExecutionResult_t* execute_commands_workflow(Token_t* tokens, u_int32_t t
     // dummy leader of the process group will be used to kill all the processes in the group if necessary
     pid_t group_id = start_dummy_leader();
 
-    Trace_result trace_result = trace_custom_command(
+    int trace_result = trace_custom_command(
         tokens, tokens_length, result, group_id
     );
 

@@ -19,7 +19,7 @@ typedef struct {
 Trace_result run_tracer(pid_t pid, pid_t group_id);
 // Executes custom (non-buildin) command from executable file
 
-Trace_result trace_custom_command(Token_t* tokens, u_int32_t tokens_length, CommandExecutionResult_t* execution_result, pid_t group_id);
+int trace_custom_command(Token_t* tokens, u_int32_t tokens_length, CommandExecutionResult_t* execution_result, pid_t group_id);
 
 pid_t start_dummy_leader();
 
