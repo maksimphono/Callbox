@@ -7,6 +7,5 @@
 #include "utils.h"
 
 Token_t* read_rules_from_file(Token_t filename);
-char* read_command_from_terminal();
 
 #endif

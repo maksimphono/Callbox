@@ -6,8 +6,8 @@
 int main() {
   char* s = (char*)malloc(19);
   int n = 0;
-  scanf("%s", s);
-  printf("qA  we");
+  n = scanf("%s", s);
+  printf("qA  wee");
   free(s);
   //char c = getc(stdin);
   //write(1, "qwe", 3);

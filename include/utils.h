@@ -85,21 +85,10 @@ char* replace_esc_seq(Token_t token);
 
 char* detect_sandbox(char* _raw_command);
 
-// Same as regular 'execvp', but ignores all stdout redirections
-int execvp_ignore_redirect(Token_t command, Token_t* tokens, u_int32_t tokens_length);
-
 // Waits for child process to finish execution, analyzes exit code
 // and print corresponding error message if necessary
 void wait_child_finish(int pid);
 
-// Finds all files (or devices) where stdout is redirected in the command, opens corresponding file descriptors and returns them in the array
-int* find_stdout_redirect_targets(Token_t* tokens, u_int32_t tokens_length, u_int32_t* targets_num);
-
-// Writes message to current terminal session, 
-// regardless of is process child or where it's stdout points to
-void write_to_terminal(const char *message);
-
-void init_environment();
 // Will set rules for the syscall by provided name
 void cleanup(char* raw_command);
 

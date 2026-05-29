@@ -1,17 +1,7 @@
 #include "../include/print_message.h"
 
-void print_prompt() {
-    printf("esh > ");
-    fflush(stdout);
-}
-
 void print_invalid_syntax() {
     printf("Invalid Syntax\n");
-    fflush(stdout);
-}
-
-void print_command_not_found() {
-    printf("Command Not Found\n");
     fflush(stdout);
 }
 
