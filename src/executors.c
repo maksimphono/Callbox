@@ -4,6 +4,7 @@
 Trace_result run_tracer(pid_t pid, pid_t group_id) {
     int status;
     bool in_syscall = false;
+    bool is_filtered = false;
 
     // Wait for the child to stop (first stop is right after PTRACE_TRACEME)
     if (waitpid(pid, &status, 0) == -1) {
@@ -49,23 +50,18 @@ Trace_result run_tracer(pid_t pid, pid_t group_id) {
                         }
 
                         if (ptrace(PTRACE_CONT, pid, 0, 0) == -1) {
-                            return 1;
+                            return UNKNOWN_ERROR;
                         }
 
                         return BLOCKED_SYSCALL;
                     } else if (required_action == FILTER) {
-                        // to indicate that syscall must not be executed (kernel must jump to syscall exit immediately)
-                        regs.rax = -1;
+                        // first stage of filtering: on syscall enter change it's number, make kernel skip it's execution
                         regs.orig_rax = -1;
                         if (ptrace(PTRACE_SETREGS, pid, 0, &regs) == -1) {
                             return UNKNOWN_ERROR;
                         }
 
-                        if (ptrace(PTRACE_SYSCALL, pid, 0, 0) == -1) {
-                            return UNKNOWN_ERROR;
-                        }
-
-                        return FILTERED_SYSCALL;
+                        is_filtered = true;
                     } else if (required_action == NOTIFY) {
                         printf("notify\n");
                         fflush(stdout);
@@ -75,7 +71,17 @@ Trace_result run_tracer(pid_t pid, pid_t group_id) {
             }
             else {
                 long return_value = regs.rax;
-                in_syscall = false; 
+                in_syscall = false;
+
+                if (is_filtered) {
+                    // second stage of filtering: on syscall exit make it look like syscall execution returns access error
+                    regs.rax = -EACCES;
+                    if (ptrace(PTRACE_SETREGS, pid, 0, &regs) == -1) {
+                        return UNKNOWN_ERROR;
+                    }
+
+                    is_filtered = false;
+                }
             }
         // Resume execution and wait for the next syscall stop
         }
