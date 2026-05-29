@@ -23,60 +23,59 @@ Trace_result run_tracer(pid_t pid, pid_t group_id) {
 
         if (WIFSTOPPED(status) && (WSTOPSIG(status) & 0x80)) {
             if (not(in_syscall)) {
-            reg_t syscall_num = regs.orig_rax; // Syscall number is stored in orig_rax (x86_64)
+                reg_t syscall_num = regs.orig_rax; // Syscall number is stored in orig_rax (x86_64)
 
-            if (get_rules_for_syscall_id(syscall_num) != NULL){
-                // syscall propably should be blocked
-                Action_type required_action = print_blocked_syscall_arguments(syscall_num, pid, regs);
+                if (get_rules_for_syscall_id(syscall_num) != NULL){
+                    // syscall propably should be blocked
+                    Action_type required_action = print_blocked_syscall_arguments(syscall_num, pid, regs);
 
-                if (required_action == BLOCK){
-                    // syscall really should be blocked, exiting
-                    if (group_id > 0) {
-                        if (kill(-group_id, SIGKILL) == -1) { // killing all other processes in the group instantly
-                            // Fallback to exit_group on the tracee if group kill fails (unlikely)
-                            regs.orig_rax = 231; regs.rdi = 2;
-                            ptrace(PTRACE_SETREGS, pid, 0, &regs);
-                            ptrace(PTRACE_CONT, pid, 0, 0);
+                    if (required_action == BLOCK){
+                        // syscall really should be blocked, exiting
+                        if (group_id > 0) {
+                            if (kill(-group_id, SIGKILL) == -1) { // killing all other processes in the group instantly
+                                // Fallback to exit_group on the tracee if group kill fails (unlikely)
+                                regs.orig_rax = 231; regs.rdi = 2;
+                                ptrace(PTRACE_SETREGS, pid, 0, &regs);
+                                ptrace(PTRACE_CONT, pid, 0, 0);
+                            }
+
+                            return BLOCKED_SYSCALL;
+                        }
+                        regs.orig_rax = 231;
+                        regs.rdi = 1;
+
+                        if (ptrace(PTRACE_SETREGS, pid, 0, &regs) == -1) {
+                            return UNKNOWN_ERROR;
+                        }
+
+                        if (ptrace(PTRACE_CONT, pid, 0, 0) == -1) {
+                            return 1;
                         }
 
                         return BLOCKED_SYSCALL;
-                    }
-                    regs.orig_rax = 231;
-                    regs.rdi = 1;
+                    } else if (required_action == FILTER) {
+                        // to indicate that syscall must not be executed (kernel must jump to syscall exit immediately)
+                        regs.rax = -1;
+                        regs.orig_rax = -1;
+                        if (ptrace(PTRACE_SETREGS, pid, 0, &regs) == -1) {
+                            return UNKNOWN_ERROR;
+                        }
 
-                    if (ptrace(PTRACE_SETREGS, pid, 0, &regs) == -1) {
-                        return UNKNOWN_ERROR;
-                    }
+                        if (ptrace(PTRACE_SYSCALL, pid, 0, 0) == -1) {
+                            return UNKNOWN_ERROR;
+                        }
 
-                    if (ptrace(PTRACE_CONT, pid, 0, 0) == -1) {
-                        return 1;
+                        return FILTERED_SYSCALL;
+                    } else if (required_action == NOTIFY) {
+                        printf("notify\n");
+                        fflush(stdout);
                     }
-
-                    return BLOCKED_SYSCALL;
-                } else if (required_action == FILTER) {
-                    // to indicate that syscall must not be executed (kernel must jump to syscall exit immediately)
-                    regs.rax = -1;
-                    regs.orig_rax = -1;
-                    if (ptrace(PTRACE_SETREGS, pid, 0, &regs) == -1) {
-                        return UNKNOWN_ERROR;
-                    }
-
-                    if (ptrace(PTRACE_SYSCALL, pid, 0, 0) == -1) {
-                        return UNKNOWN_ERROR;
-                    }
-
-                    return FILTERED_SYSCALL;
-                } else if (required_action == NOTIFY) {
-                    printf("notify\n");
-                    fflush(stdout);
                 }
-            }
-            in_syscall = true;
-
+                in_syscall = true;
             }
             else {
-            long return_value = regs.rax;
-            in_syscall = false; 
+                long return_value = regs.rax;
+                in_syscall = false; 
             }
         // Resume execution and wait for the next syscall stop
         }
