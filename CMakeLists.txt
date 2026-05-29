@@ -4,6 +4,8 @@ project(SyscallBox LANGUAGES C)
 # Regular build:
 
 add_executable(main
+    src/cli_arguments.c
+    src/argparse.c
     src/executors.c
     src/print_message.c
     src/readers.c
@@ -20,6 +22,7 @@ target_link_libraries(main tokenize)
 # Memory debug:
 
 add_executable(main_mem
+    src/argparse.c
     src/executors.c
     src/print_message.c
     src/readers.c
