@@ -1,5 +1,10 @@
 #include "../include/print_message.h"
 
+void print_missing_tracee() {
+    printf("Error: Traced program is missing, please specify program to trace after '--'");
+    fflush(stdout);
+}
+
 void print_invalid_syntax() {
     printf("Invalid Syntax\n");
     fflush(stdout);

@@ -4,12 +4,14 @@ Arguments cli_arguments = {
     NULL, NULL, NULL
 };
 
-Arguments* scan_cli_arguments(int argc, const char** argv) {
+Arguments* scan_cli_arguments(u_int32_t* arg_num, u_int32_t argc, const char** argv) {
     static const char *const usages[] = {
         "basic [options] [[--] args]",
         "basic [options]",
         NULL,
     };
+
+    u_int32_t args_end_index = 0;
 
     struct argparse_option options[] = {
         OPT_HELP(),
@@ -20,12 +22,24 @@ Arguments* scan_cli_arguments(int argc, const char** argv) {
         OPT_END(),
     };
 
+    // locating argument '--', after that tracee will be specified
+    for (args_end_index = 0; args_end_index < argc; args_end_index++) {
+        if (strncmp("--", argv[args_end_index], 3) == 0) {
+            break;
+        }
+    }
+
+    if (args_end_index == argc) {
+        print_missing_tracee();
+        return NULL;
+    }
+
     struct argparse argparse;
     argparse_init(&argparse, options, usages, 0);
     argparse_describe(&argparse, PROGRAM_DESCRIPTION, "");
-    argc = argparse_parse(&argparse, argc, argv);
+    argparse_parse(&argparse, args_end_index, argv);
 
-    printf("Rules: %s, Inp: %s, Out: %s\n", cli_arguments.rules_file, cli_arguments.input_file, cli_arguments.trace_output_file);
+    *arg_num = args_end_index;
 
     return &cli_arguments;
 }

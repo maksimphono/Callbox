@@ -16,17 +16,19 @@ Token_t* prepare_tokens(int argc, const char** argv){
 }
 
 
-int main(int argc, const char** argv) {
-    
-    scan_cli_arguments(argc, argv);
-    fflush(stdout);
-    exit(0);
+int main(u_int32_t argc, const char** argv) {
+    u_int32_t arg_num = 0;
+    Arguments* cli_arguments = scan_cli_arguments(&arg_num, argc, argv);
+
+    if (cli_arguments == NULL) {
+        return 1;
+    }
 
     init_syscall_rules();
 
-    Token_t* tokens = prepare_tokens(argc, argv);
+    Token_t* tokens = prepare_tokens(argc - arg_num, argv + arg_num);
 
-    execute_commands_workflow(tokens, (u_int32_t)argc - 1);
+    execute_commands_workflow(tokens, (u_int32_t)(argc - arg_num) - 1);
 
     free(tokens);
 
