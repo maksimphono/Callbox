@@ -1,7 +1,7 @@
 #include "../include/print_message.h"
 
 void print_missing_tracee() {
-    printf("Error: Traced program is missing, please specify program to trace after '--'");
+    printf("Error: Traced program is missing, please specify program to trace after '--'\n");
     fflush(stdout);
 }
 
@@ -12,6 +12,11 @@ void print_invalid_syntax() {
 
 void print_execution_error() {
     printf("Execution Error\n");
+    fflush(stdout);
+}
+
+void print_empty_rules() {
+    printf("Warning: rules file wan't specified, tracing will be ineffetive. You can specify path to the rules file with argument '--rules'\n");
     fflush(stdout);
 }
 

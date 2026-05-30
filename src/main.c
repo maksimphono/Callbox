@@ -28,7 +28,7 @@ int main(u_int32_t argc, const char** argv) {
 
     Token_t* tokens = prepare_tokens(argc - arg_num, argv + arg_num);
 
-    execute_commands_workflow(tokens, (u_int32_t)(argc - arg_num) - 1);
+    execute_commands_workflow(tokens, (u_int32_t)(argc - arg_num) - 1, cli_arguments);
 
     free(tokens);
 

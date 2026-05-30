@@ -87,7 +87,7 @@ Trace_result run_tracer(pid_t pid, pid_t group_id) {
 }
 
 
-int trace_custom_command(Token_t* tokens, u_int32_t tokens_length, CommandExecutionResult_t* execution_result, int prev_pipe_read_fd) {
+int trace_program(Token_t* tokens, u_int32_t tokens_length, CommandExecutionResult_t* execution_result, int prev_pipe_read_fd) {
     pid_t tracee_pid;
 
     tracee_pid = fork();
@@ -166,17 +166,21 @@ int trace_custom_command(Token_t* tokens, u_int32_t tokens_length, CommandExecut
 
 
 // Executes full pipeline of commands (series of commands, connected by pipes '|')
-CommandExecutionResult_t* execute_commands_workflow(Token_t* tokens, u_int32_t tokens_length) {
+CommandExecutionResult_t* execute_commands_workflow(Token_t* tokens, u_int32_t tokens_length, Arguments* cli_arguments) {
     // it's a pipeline of commands
     CommandExecutionResult_t* result = NULL;
 
-    int prev_pipe_read_fd = open("inp", O_RDONLY);
+    int prev_pipe_read_fd = STDIN_FILENO; // read from stdin by default
 
-    // dummy leader of the process group will be used to kill all the processes in the group if necessary
+    if (cli_arguments->input_file != NULL)
+        prev_pipe_read_fd = open(cli_arguments->input_file, O_RDONLY);
 
-    read_rules_from_file("ru");
+    if (cli_arguments->rules_file != NULL)
+        read_rules_from_file(cli_arguments->rules_file);
+    else
+        print_empty_rules();
 
-    int trace_result = trace_custom_command(
+    int trace_result = trace_program(
         tokens, tokens_length, result, prev_pipe_read_fd
     );
 

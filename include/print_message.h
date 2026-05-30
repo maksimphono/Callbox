@@ -6,6 +6,8 @@
 
 void print_missing_tracee();
 
+void print_empty_rules();
+
 void print_invalid_syntax();
 
 void print_execution_error();
