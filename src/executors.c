@@ -1,6 +1,6 @@
 #include "../include/executors.h"
 
-Trace_result run_tracer(pid_t pid, pid_t group_id) {
+Trace_result run_tracer(pid_t pid, pid_t group_id, int trace_output_fd) {
     int status;
     bool in_syscall = false;
     bool is_filtered = false;
@@ -23,7 +23,7 @@ Trace_result run_tracer(pid_t pid, pid_t group_id) {
 
                 if (get_rules_for_syscall_id(syscall_num) != NULL){
                     // syscall propably should be blocked
-                    Action_type required_action = print_blocked_syscall_arguments(syscall_num, pid, regs);
+                    Action_type required_action = print_blocked_syscall_arguments(syscall_num, pid, regs, trace_output_fd);
 
                     if (required_action == BLOCK){
                         // syscall really should be blocked, exiting
@@ -87,7 +87,7 @@ Trace_result run_tracer(pid_t pid, pid_t group_id) {
 }
 
 
-int trace_program(Token_t* tokens, u_int32_t tokens_length, CommandExecutionResult_t* execution_result, int prev_pipe_read_fd) {
+int trace_program(Token_t* tokens, u_int32_t tokens_length, CommandExecutionResult_t* execution_result, int prev_pipe_read_fd, int trace_output_fd) {
     pid_t tracee_pid;
 
     tracee_pid = fork();
@@ -135,7 +135,7 @@ int trace_program(Token_t* tokens, u_int32_t tokens_length, CommandExecutionResu
             close(prev_pipe_read_fd);
         }
 
-        Trace_result tracer_result = run_tracer(tracee_pid, tracee_pid);
+        Trace_result tracer_result = run_tracer(tracee_pid, tracee_pid, trace_output_fd);
         int tracee_status;
 
         waitpid(tracee_pid, &tracee_status, 0);
@@ -171,6 +171,7 @@ CommandExecutionResult_t* execute_commands_workflow(Token_t* tokens, u_int32_t t
     CommandExecutionResult_t* result = NULL;
 
     int prev_pipe_read_fd = STDIN_FILENO; // read from stdin by default
+    int trace_output_fd = STDOUT_FILENO;
 
     if (cli_arguments->input_file != NULL)
         prev_pipe_read_fd = open(cli_arguments->input_file, O_RDONLY);
@@ -180,9 +181,16 @@ CommandExecutionResult_t* execute_commands_workflow(Token_t* tokens, u_int32_t t
     else
         print_empty_rules();
 
+    if (cli_arguments->trace_output_file != NULL) {
+        trace_output_fd = open(cli_arguments->trace_output_file, O_CREAT | O_WRONLY | O_TRUNC, 0644);
+    }
+
     int trace_result = trace_program(
-        tokens, tokens_length, result, prev_pipe_read_fd
+        tokens, tokens_length, result, prev_pipe_read_fd, trace_output_fd
     );
+
+    if (trace_output_fd != STDOUT_FILENO) 
+        close(trace_output_fd);
 
     //if (group_id > 0) {
     //    int status;

@@ -268,7 +268,7 @@ bool cmp_syscall_argument(Syscall_argument argument, reg_t value, char* str_valu
 }
 
 // TODO: process empty string in the rules and in outputs
-Action_type print_blocked_syscall_arguments(reg_t syscall_num, pid_t pid, struct user_regs_struct regs) {
+Action_type print_blocked_syscall_arguments(reg_t syscall_num, pid_t pid, struct user_regs_struct regs, int trace_output_fd) {
     const Syscall_arg_type* types = get_syscall_argument_types(syscall_num);
     const reg_t raw_arguments[MAX_SYSCALL_ARGS_NUM] = {regs.rdi, regs.rsi, regs.rdx, regs.r10, regs.r8, regs.r9};
     char* str_arguments[MAX_SYSCALL_ARGS_NUM] = {};
@@ -338,13 +338,13 @@ Action_type print_blocked_syscall_arguments(reg_t syscall_num, pid_t pid, struct
 
     switch (required_action) {
     case BLOCK:
-        print_catched_syscall("Blocked", get_name_for_syscall_id(syscall_num), argument_num, str_arguments[0], str_arguments[1], str_arguments[2], str_arguments[3], str_arguments[4], str_arguments[5]);
+        print_catched_syscall(trace_output_fd, "Blocked", get_name_for_syscall_id(syscall_num), argument_num, str_arguments[0], str_arguments[1], str_arguments[2], str_arguments[3], str_arguments[4], str_arguments[5]);
         break;
     case FILTER:
-        print_catched_syscall("Filtered", get_name_for_syscall_id(syscall_num), argument_num, str_arguments[0], str_arguments[1], str_arguments[2], str_arguments[3], str_arguments[4], str_arguments[5]);
+        print_catched_syscall(trace_output_fd, "Filtered", get_name_for_syscall_id(syscall_num), argument_num, str_arguments[0], str_arguments[1], str_arguments[2], str_arguments[3], str_arguments[4], str_arguments[5]);
         break;
     case NOTIFY:
-        print_catched_syscall("Detected", get_name_for_syscall_id(syscall_num), argument_num, str_arguments[0], str_arguments[1], str_arguments[2], str_arguments[3], str_arguments[4], str_arguments[5]);
+        print_catched_syscall(trace_output_fd, "Detected", get_name_for_syscall_id(syscall_num), argument_num, str_arguments[0], str_arguments[1], str_arguments[2], str_arguments[3], str_arguments[4], str_arguments[5]);
         break;
     }
 

@@ -20,15 +20,15 @@ void print_empty_rules() {
     fflush(stdout);
 }
 
-void print_catched_syscall(const char* action, char* syscall_name, int count, ...) {
+void print_catched_syscall(int fd, const char* action, char* syscall_name, int count, ...) {
     va_list args;
     va_start(args, count);
-    printf("%s Syscall: %s ", action, syscall_name);
+    dprintf(fd, "%s Syscall: %s ", action, syscall_name);
 
     for (int i = 0; i < count; i++) {
         char* arg = va_arg(args, char*);
-        printf("%s ", arg);
+        dprintf(fd, "%s ", arg);
     }
-    printf("\n");
-    fflush(stdout);
+    dprintf(fd, "\n");
+    //fflush(fd);
 }

@@ -12,6 +12,6 @@ void print_invalid_syntax();
 
 void print_execution_error();
 
-void print_catched_syscall(const char*, char* syscall_name, int count, ...);
+void print_catched_syscall(int, const char*, char* syscall_name, int count, ...);
 
 #endif
