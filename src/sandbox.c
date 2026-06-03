@@ -81,6 +81,9 @@ void record_syscall_with_rules(u_int32_t syscall_num) {
     syscalls_with_rules = new_node;
 }
 
+// TODO: create custom handlers for special syscalls, that requires specific tracing strategy
+//       for example with variadic or strange array arguments
+
 // Will set rules for the syscall by provided name
 // arguments must be in exact order (argument 0, argument 1, argument 2...)
 void set_rules_for_syscall_name(char* name, char** arguments, u_int32_t arguments_length, Action_type action) {
@@ -110,6 +113,10 @@ void set_rules_for_syscall_name(char* name, char** arguments, u_int32_t argument
     rules = (Syscall_argument*)malloc((arguments_length + 1) * sizeof(Syscall_argument));
     syscalls_table[syscall_num].rules = rules;
     syscalls_table[syscall_num].action = action;
+
+    // TODO: when the argument type is ARRAY_TYPE, check it user specified a string or regex
+    //       if yes: print perform regex matching (if needed) and print it using "printf"
+    //       if no: print all read bytes one by one using "putc"
 
     // copying arguments, if no arguments were specified -> just allocate memory and mark, that this syscall is forbidden
     for (i = 0; i < arguments_length; i++) {
@@ -291,6 +298,9 @@ Action_type print_blocked_syscall_arguments(reg_t syscall_num, pid_t pid, struct
             char c = 1;
             u_int32_t j = 0;
 
+            // TODO: 
+            //  1) improve this by reading all bytes at once (by the next argument)
+            //  2) implement simillar logic but cpecifically for arrays
             while (c != '\0') {
                 c = ptrace(PTRACE_PEEKDATA, pid, raw_arguments[i] + buf_len * sizeof(char), 0);
                 if (c == -1) {
