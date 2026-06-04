@@ -48,6 +48,8 @@ void clean_syscall_rules(){
             for (int i = 0; rule[i].type != ___NONE_TYPE; i++) {
                 if (rule[i].type == STRING_TYPE)
                     free(rule[i].str);
+                else if (rule[i].type == ARRAY_TYPE)
+                    free(rule[i].arr);
                 //free(rule[i]);
             }
             free(rule);
@@ -117,6 +119,8 @@ void set_rules_for_syscall_name(char* name, char** arguments, u_int32_t argument
     // TODO: when the argument type is ARRAY_TYPE, check it user specified a string or regex
     //       if yes: print perform regex matching (if needed) and print it using "printf"
     //       if no: print all read bytes one by one using "putc"
+
+    // TODO: when argument type is PAIR_TYPE: check forbidden values for both 
 
     // copying arguments, if no arguments were specified -> just allocate memory and mark, that this syscall is forbidden
     for (i = 0; i < arguments_length; i++) {
@@ -188,7 +192,11 @@ void set_rules_for_syscall_name(char* name, char** arguments, u_int32_t argument
 
             break;
         }
-        case OTHER_TYPE: {
+        case ARRAY_TYPE: {
+            // TODO: parse provided byte array
+            break;
+        }
+        default: {
             rules[i].other = (void*)arguments[i];
             break;
         }
@@ -222,6 +230,10 @@ void set_rules_for_syscall_name(char* name, char** arguments, u_int32_t argument
         }
         case STRING_TYPE: {
             printf("type: STR, val = %s\n", r[i].str);
+            break;
+        }
+        case ARRAY_TYPE: {
+            printf("type: ARR, val = %p\n", r[i].arr);
             break;
         }
         }
@@ -268,7 +280,11 @@ bool cmp_syscall_argument(Syscall_argument argument, reg_t value, char* str_valu
             return (strncmp(argument.str, str_value + 1, strlen(argument.str) - 1) == 0);
 
     }
-    case OTHER_TYPE: {
+    case ARRAY_TYPE: {
+        // TODO: implement array comparison logic
+        break;
+    }
+    default: {
         return argument.other == (void*)value;
     }
     }

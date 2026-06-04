@@ -23,7 +23,9 @@ typedef enum {
     INT_64_TYPE  = 3, 
     UINT_64_TYPE = 4, 
     STRING_TYPE  = 5, 
-    ADDRESS_TYPE = 6, 
+    ADDRESS_TYPE = 6,
+    ARRAY_TYPE   = 7,
+    VARIAD_TYPE  = 8,
     OTHER_TYPE
 } Syscall_arg_type;
 
@@ -65,6 +67,7 @@ typedef struct Syscall_argument {
             bool is_regex;
             char* str;
         };
+        unsigned char* arr;
         uintptr_t addr[2];
         void* other;
     };
@@ -72,17 +75,19 @@ typedef struct Syscall_argument {
 
 typedef struct Syscall_abstract {
     u_int32_t number;
-    const char* name;
-    const Syscall_arg_type arg_types[6];
+    const char name[SYSCALL_NAME_MAX_LEN];
+    const Syscall_arg_type arg_types[MAX_SYSCALL_ARGS_NUM];
+    unsigned char flags;  // 7th bit -> is_special | none | none | none | none | none | none | none <- 0th bit
     Syscall_argument* rules;
     Action_type action;
 } Syscall_abstract;
 
 extern const Syscall_argument EMPTY_RULES;
 
+#define IS_SPECIAL(syscall) (syscall.flags & (unsigned char)0x128)
 #define RULE_IS_NONE(rule) (rule.type == ___NONE_TYPE)
-#define EMPTY_SYSCALL {0, NULL, {___NONE_TYPE,___NONE_TYPE,___NONE_TYPE,___NONE_TYPE,___NONE_TYPE,___NONE_TYPE},NULL,NONE_ACTION}
-#define IS_EMPTY_SYSCALL(syscall) (syscall.name == NULL)
+#define EMPTY_SYSCALL {0, {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}, {___NONE_TYPE,___NONE_TYPE,___NONE_TYPE,___NONE_TYPE,___NONE_TYPE,___NONE_TYPE}, 0, NULL,NONE_ACTION}
+#define IS_EMPTY_SYSCALL(syscall) (syscall.name[0] == 0)
 
 typedef struct Node_recorded_rules_t {u_int32_t syscall_num; struct Node_recorded_rules_t* next;} Node_recorded_rules_t;
 

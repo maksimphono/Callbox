@@ -12,6 +12,8 @@ typedef unsigned long long reg_t; // data type to store value, read from 64-bit 
 
 #define SYSCALL_ARG_TYPES_LENGTH 8
 
+#define SYSCALL_NAME_MAX_LEN 24
+
 #define MAX_SYSCALL_ARGS_NUM 6
 
 #define IS_CHILD(p_id) (p_id == 0)
