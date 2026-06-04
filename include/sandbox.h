@@ -67,7 +67,10 @@ typedef struct Syscall_argument {
             bool is_regex;
             char* str;
         };
-        unsigned char* arr;
+        struct {
+            unsigned char* arr;
+            size_t arr_len;
+        };
         uintptr_t addr[2];
         void* other;
     };
@@ -97,7 +100,7 @@ void del_syscall_rules();
 
 bool check_rules(struct user_regs_struct regs);
 
-bool cmp_syscall_argument(Syscall_argument argument, reg_t value, char*);
+bool cmp_syscall_argument(Syscall_argument* argument, Syscall_argument*);
 
 void record_syscall_with_rules(u_int32_t syscall_num);
 
@@ -106,6 +109,8 @@ Syscall_argument* get_rules_for_syscall_id(u_int32_t id);
 const char* get_name_for_syscall_id(u_int32_t id);
 
 const Syscall_arg_type* get_syscall_argument_types(reg_t syscall_num);
+
+void clean_arguments(Syscall_argument* arguments);
 
 void clean_syscall_rules();
 

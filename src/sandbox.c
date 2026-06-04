@@ -39,21 +39,25 @@ void del_syscall_rules() {
     del_Syscall_hashmap(syscalls_map);
 }
 
+void clean_arguments(Syscall_argument* arguments) {
+    if (arguments != NULL && arguments != &EMPTY_RULES) {
+        for (int i = 0; arguments[i].type != ___NONE_TYPE; i++) {
+            if (arguments[i].type == STRING_TYPE)
+                free(arguments[i].str);
+            else if (arguments[i].type == ARRAY_TYPE)
+                free(arguments[i].arr);
+            //free(arguments[i]);
+        }
+        free(arguments);
+    }
+}
+
 void clean_syscall_rules(){
     Node_recorded_rules_t* current = syscalls_with_rules, *next;
 
     while (current != NULL) {
         Syscall_argument* rule = syscalls_table[current->syscall_num].rules; // list of rules
-        if (rule != NULL && rule != &EMPTY_RULES) {
-            for (int i = 0; rule[i].type != ___NONE_TYPE; i++) {
-                if (rule[i].type == STRING_TYPE)
-                    free(rule[i].str);
-                else if (rule[i].type == ARRAY_TYPE)
-                    free(rule[i].arr);
-                //free(rule[i]);
-            }
-            free(rule);
-        }
+        clean_arguments(rule);
         syscalls_table[current->syscall_num].rules = NULL;
 
         next = current->next;
@@ -240,52 +244,54 @@ void set_rules_for_syscall_name(char* name, char** arguments, u_int32_t argument
     }
 }
 
-bool cmp_syscall_argument(Syscall_argument argument, reg_t value, char* str_value) {
-    if (argument.type == ___NONE_TYPE) return false;
+// TODO: rewrite this function so it compares 2 objects of Syscall_argument 
+// equal => return true
+bool cmp_syscall_argument(Syscall_argument* argument, Syscall_argument* received_arg) {
+    if (argument->type == ___NONE_TYPE) return false;
 
     char *endptr = NULL;
 
-    switch (argument.type) {
+    switch (argument->type) {
     case ADDRESS_TYPE:
-        //printf("Comparing: %llx < %llx: %d", argument.addr, (u_int64_t)value, argument.addr < (u_int64_t)value);
-        return (argument.addr[0] <= (u_int64_t)value && argument.addr[1] >= (u_int64_t)value);
+        return (argument->addr[0] <= received_arg->addr[0] && argument->addr[1] >= received_arg->addr[0]);
     case UINT_64_TYPE:{
-        printf("Comparing: %llu == %llu: %d", argument.uint64, (u_int64_t)value, argument.uint64 == (u_int64_t)value);
-        return argument.uint64 == (u_int64_t)value;
+        printf("Comparing: %llu == %llu: %d", argument->uint64, received_arg->uint64, argument->uint64 == received_arg->uint64);
+        return argument->uint64 == received_arg->uint64;
     }
     case UINT_32_TYPE: {
-        printf("Comparing: %u == %u: %d", argument.uint32, (u_int32_t)value, argument.uint32 == (u_int32_t)value);
-        return argument.uint32 == (u_int32_t)value;
+        printf("Comparing: %u == %u: %d", argument->uint32, received_arg->uint32, argument->uint32 == received_arg->uint32);
+        return argument->uint32 == received_arg->uint32;
     }
     case INT_32_TYPE: {
-        printf("Comparing: %d == %d: %d", argument.int32, (int32_t)value, argument.int32 == (int32_t)value);
-        return argument.int32 == (int32_t)value;
+        printf("Comparing: %d == %d: %d", argument->int32, received_arg->int32, argument->int32 == received_arg->int32);
+        return argument->int32 == received_arg->int32;
     }
     case INT_64_TYPE: {
-        printf("Comparing: %lld == %lld: %d", argument.int64, (int64_t)value, argument.int64 == (int64_t)value);
-        return argument.int64 == (int64_t)value;
+        printf("Comparing: %lld == %lld: %d", argument->int64, received_arg->int64, argument->int64 == received_arg->int64);
+        return argument->int64 == received_arg->int64;
     }
     case STRING_TYPE: {
-        printf("Comparing: %s == %s: %d", argument.str, str_value, strcmp(argument.str, str_value));
-        if (argument.is_regex) {
+        printf("Comparing: %s == %s: %d", argument->str, received_arg->str, strcmp(argument->str, received_arg->str));
+        if (argument->is_regex) {
             bool res = false;
-            ssize_t len = strlen(str_value);
+            //ssize_t len = strlen(received_arg->str);
             // accunting for the quotes (") at the start and end of the matched string
-            str_value[len - 1] = '\0';
-            res = (check_regex(str_value + 1, argument.str) == 0);
-            str_value[len - 1] = '"';
+            //received_arg->str[len - 1] = '\0';
+            res = (check_regex(received_arg->str, argument->str) == 0);
+            //received_arg->str[len - 1] = '"';
             return res;
         } else
             // accunting for the quotes (") at the start and end of the string
-            return (strncmp(argument.str, str_value + 1, strlen(argument.str) - 1) == 0);
+            return (strncmp(argument->str, received_arg->str, strlen(argument->str)) == 0);
 
     }
     case ARRAY_TYPE: {
         // TODO: implement array comparison logic
-        break;
+        if (argument->arr_len != received_arg->arr_len) return false;
+        return (memcmp(argument->arr, received_arg->arr, received_arg->arr_len * sizeof(byte_t)) == 0);
     }
     default: {
-        return argument.other == (void*)value;
+        return argument->other == received_arg->other;
     }
     }
 }
@@ -364,35 +370,37 @@ char* read_str_from_tracee(pid_t pid, reg_t addr) {
 Action_type print_blocked_syscall_arguments(reg_t syscall_num, pid_t pid, struct user_regs_struct regs, int trace_output_fd) {
     const Syscall_arg_type* types = get_syscall_argument_types(syscall_num);
     const reg_t raw_arguments[MAX_SYSCALL_ARGS_NUM] = {regs.rdi, regs.rsi, regs.rdx, regs.r10, regs.r8, regs.r9};
-    char* str_arguments[MAX_SYSCALL_ARGS_NUM] = {};
-    const u_int32_t DEFAULT_BUFER_LEN = 20;
-    char* buffer_c = NULL;
-    byte_t* buffer_b = NULL;
+    Syscall_argument received_args[MAX_SYSCALL_ARGS_NUM] = {};
     const char* syscall_args_print_formats[] = {NULL, "%d", "%u", "%lld", "%llu", "\"%s\"", "0x%llx", "0x%llx", "0x%llx", "0x%llx"};
     Action_type required_action = syscalls_table[syscall_num].action; // entering this function automatically means, that syscall is assumed to be blocked
 
-    u_int8_t buf_len = 0;
     u_int8_t argument_num = 0;
     u_int8_t i = 0;
 
     // collect arguments in form of array of Syscall_argument
     for (i = 0; types[i] != ___NONE_TYPE && i < MAX_SYSCALL_ARGS_NUM; i++) {
-        if (types[i] == STRING_TYPE) {
+        received_args[i].type = types[i];
+        switch (types[i]) {
+        case (STRING_TYPE): {
             // read the string
-            str_arguments[i] = read_str_from_tracee(pid, raw_arguments[i]);
-            //sprintf(str_arguments[i], syscall_args_print_formats[types[i]], buffer_c);
-        } else if (types[i] == ARRAY_TYPE) {
+            received_args[i].str = read_str_from_tracee(pid, raw_arguments[i]);
+            //sprintf(received_args[i], syscall_args_print_formats[types[i]], buffer_c);
+            break;
+        }
+        case (ARRAY_TYPE): {
             // in regular syscall assuming that the very next argument is a length
-            buffer_b = read_data_from_tracee(pid, raw_arguments[i], (size_t)raw_arguments[i + 1]);
-            //str_arguments[i] = (char*)malloc((buf_len + 2 + 1) * sizeof(char));
-            //sprintf(str_arguments[i], syscall_args_print_formats[types[i]], buffer);
-
-        } else {
-            // prepare argument for printing according to format
-            buffer_c = (char*)malloc(99);
-            buf_len = sprintf(buffer_c, syscall_args_print_formats[types[i]], raw_arguments[i]);
-            str_arguments[i] = (char*)malloc((buf_len + 1) * sizeof(char));
-            strcpy(str_arguments[i], buffer_c);
+            received_args[i].arr_len = (size_t)raw_arguments[i + 1];
+            received_args[i].arr = read_data_from_tracee(pid, raw_arguments[i], received_args[i].arr_len);
+            //received_args[i] = (char*)malloc((buf_len + 2 + 1) * sizeof(char));
+            //sprintf(received_args[i], syscall_args_print_formats[types[i]], buffer);
+            break;
+        }
+        case UINT_32_TYPE: { received_args[i].uint32 = (u_int32_t)raw_arguments[i]; break; }
+        case UINT_64_TYPE: { received_args[i].uint64 = (u_int64_t)raw_arguments[i]; break; }
+        case INT_32_TYPE: { received_args[i].int32 = (int32_t)raw_arguments[i]; break; }
+        case INT_64_TYPE: { received_args[i].int64 = (int64_t)raw_arguments[i]; break; }
+        case ADDRESS_TYPE: { received_args[i].addr[0] = (uintptr_t)raw_arguments[i]; break; }
+        default: { received_args[i].other = (void*)raw_arguments[i]; break; }
         }
     }
     argument_num = i;
@@ -400,8 +408,9 @@ Action_type print_blocked_syscall_arguments(reg_t syscall_num, pid_t pid, struct
     // check if syscall arguments actually are forbidden
     if (get_rules_for_syscall_id(syscall_num) != &EMPTY_RULES) {
         for (i = 0; i < argument_num && get_rules_for_syscall_id(syscall_num)[i].type != ___NONE_TYPE; i++) {
-            Syscall_argument arg = get_rules_for_syscall_id(syscall_num)[i];
-            if (not(cmp_syscall_argument(arg, raw_arguments[i], str_arguments[i]))) {
+            Syscall_argument* arg = &get_rules_for_syscall_id(syscall_num)[i];
+            if (not(cmp_syscall_argument(arg, &received_args[i]))) {
+                // arguments don't match -> do nothing
                 required_action = NONE_ACTION;
                 break;
             }
@@ -411,23 +420,22 @@ Action_type print_blocked_syscall_arguments(reg_t syscall_num, pid_t pid, struct
 
     switch (required_action) {
     case BLOCK:
-        print_catched_syscall(trace_output_fd, "Blocked", get_name_for_syscall_id(syscall_num), argument_num, str_arguments[0], str_arguments[1], str_arguments[2], str_arguments[3], str_arguments[4], str_arguments[5]);
+        print_catched_syscall(trace_output_fd, "Blocked", get_name_for_syscall_id(syscall_num), argument_num, received_args[0], received_args[1], received_args[2], received_args[3], received_args[4], received_args[5]);
         break;
     case FILTER:
-        print_catched_syscall(trace_output_fd, "Filtered", get_name_for_syscall_id(syscall_num), argument_num, str_arguments[0], str_arguments[1], str_arguments[2], str_arguments[3], str_arguments[4], str_arguments[5]);
+        print_catched_syscall(trace_output_fd, "Filtered", get_name_for_syscall_id(syscall_num), argument_num, received_args[0], received_args[1], received_args[2], received_args[3], received_args[4], received_args[5]);
         break;
     case NOTIFY:
-        print_catched_syscall(trace_output_fd, "Detected", get_name_for_syscall_id(syscall_num), argument_num, str_arguments[0], str_arguments[1], str_arguments[2], str_arguments[3], str_arguments[4], str_arguments[5]);
+        print_catched_syscall(trace_output_fd, "Detected", get_name_for_syscall_id(syscall_num), argument_num, received_args[0], received_args[1], received_args[2], received_args[3], received_args[4], received_args[5]);
         break;
     }
 
-
-    for (int i = 0; i < argument_num; i++) {
-        free(str_arguments[i]);
+    for (Syscall_argument* arg = &received_args[0]; arg != &received_args[MAX_SYSCALL_ARGS_NUM]; arg++) {
+        if (arg->type == STRING_TYPE)
+            free(arg->str);
+        else if (arg->type == ARRAY_TYPE)
+            free(arg->arr);
     }
-
-    free(buffer_c);
-    free(buffer_b);
 
     fflush(stdout);
     return required_action;
