@@ -290,7 +290,7 @@ bool cmp_syscall_argument(Syscall_argument argument, reg_t value, char* str_valu
     }
 }
 
-byte_t* read_data_from_tracee(pid_t, pid, reg_t addr, size_t length) {
+byte_t* read_data_from_tracee(pid_t pid, reg_t addr, size_t length) {
     long word = 0;
     size_t sizeof_word = sizeof(word);
     size_t bytes_read = 0;
@@ -317,7 +317,7 @@ byte_t* read_data_from_tracee(pid_t, pid, reg_t addr, size_t length) {
     return data;
 }
 
-char* read_str_from_tracee(pid_t, pid, reg_t addr) {
+char* read_str_from_tracee(pid_t pid, reg_t addr) {
     long word = 0;
     size_t sizeof_word = sizeof(word);
     size_t bytes_read = 0;
@@ -378,21 +378,21 @@ Action_type print_blocked_syscall_arguments(reg_t syscall_num, pid_t pid, struct
     // collect arguments in form of array of Syscall_argument
     for (i = 0; types[i] != ___NONE_TYPE && i < MAX_SYSCALL_ARGS_NUM; i++) {
         if (types[i] == STRING_TYPE) {
-            // collect the string
+            // read the string
             str_arguments[i] = read_str_from_tracee(pid, raw_arguments[i]);
             //sprintf(str_arguments[i], syscall_args_print_formats[types[i]], buffer_c);
-        else if (types[i] == ARRAY_TYPE) {
+        } else if (types[i] == ARRAY_TYPE) {
             // in regular syscall assuming that the very next argument is a length
             buffer_b = read_data_from_tracee(pid, raw_arguments[i], (size_t)raw_arguments[i + 1]);
-            str_arguments[i] = (char*)malloc((buf_len + 2 + 1) * sizeof(char));
-            sprintf(str_arguments[i], syscall_args_print_formats[types[i]], buffer);
-        }
+            //str_arguments[i] = (char*)malloc((buf_len + 2 + 1) * sizeof(char));
+            //sprintf(str_arguments[i], syscall_args_print_formats[types[i]], buffer);
 
         } else {
             // prepare argument for printing according to format
-            buf_len = sprintf(buffer, syscall_args_print_formats[types[i]], raw_arguments[i]);
+            buffer_c = (char*)malloc(99);
+            buf_len = sprintf(buffer_c, syscall_args_print_formats[types[i]], raw_arguments[i]);
             str_arguments[i] = (char*)malloc((buf_len + 1) * sizeof(char));
-            strcpy(str_arguments[i], buffer);
+            strcpy(str_arguments[i], buffer_c);
         }
     }
     argument_num = i;
@@ -421,13 +421,13 @@ Action_type print_blocked_syscall_arguments(reg_t syscall_num, pid_t pid, struct
         break;
     }
 
-        
 
     for (int i = 0; i < argument_num; i++) {
         free(str_arguments[i]);
     }
 
-    free(buffer);
+    free(buffer_c);
+    free(buffer_b);
 
     fflush(stdout);
     return required_action;
