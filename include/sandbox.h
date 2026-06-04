@@ -11,9 +11,7 @@
 #include <stdint.h>
 
 #include "defs.h"
-#include "print_message.h"
 #include "utils.h"
-
 
 typedef enum {SUCCESS, UNKNOWN_ERROR, BLOCKED_SYSCALL, FILTERED_SYSCALL, NOTIFIED_SYSCALL} Trace_result;
 typedef enum {

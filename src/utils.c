@@ -1,4 +1,5 @@
 #include "../include/utils.h"
+#include "../include/print_message.h"
 
 int check_regex(char* str, const char* pattern) {
     regex_t regex;

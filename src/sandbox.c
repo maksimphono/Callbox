@@ -1,6 +1,7 @@
 #include "../include/sandbox.h"
 #include "../include/hashmap.h"
 #include "../include/syscalls_table.h"
+#include "../include/print_message.h"
 
 Syscall_hashmap_t* syscalls_map;
 Node_recorded_rules_t* syscalls_with_rules = NULL;
@@ -198,6 +199,15 @@ void set_rules_for_syscall_name(char* name, char** arguments, u_int32_t argument
         }
         case ARRAY_TYPE: {
             // TODO: parse provided byte array
+            rules[i].arr = (byte_t*)malloc(7);
+            rules[i].arr[0] = 'q';
+            rules[i].arr[1] = 'A';
+            rules[i].arr[2] = ' ';
+            rules[i].arr[3] = ' ';
+            rules[i].arr[4] = 'w';
+            rules[i].arr[5] = 'e';
+            rules[i].arr[6] = '\n';
+            rules[i].arr_len = 7;
             break;
         }
         default: {
@@ -420,13 +430,13 @@ Action_type print_blocked_syscall_arguments(reg_t syscall_num, pid_t pid, struct
 
     switch (required_action) {
     case BLOCK:
-        print_catched_syscall(trace_output_fd, "Blocked", get_name_for_syscall_id(syscall_num), argument_num, received_args[0], received_args[1], received_args[2], received_args[3], received_args[4], received_args[5]);
+        print_catched_syscall(trace_output_fd, "Blocked", get_name_for_syscall_id(syscall_num), argument_num, received_args);
         break;
     case FILTER:
-        print_catched_syscall(trace_output_fd, "Filtered", get_name_for_syscall_id(syscall_num), argument_num, received_args[0], received_args[1], received_args[2], received_args[3], received_args[4], received_args[5]);
+        print_catched_syscall(trace_output_fd, "Filtered", get_name_for_syscall_id(syscall_num), argument_num, received_args);
         break;
     case NOTIFY:
-        print_catched_syscall(trace_output_fd, "Detected", get_name_for_syscall_id(syscall_num), argument_num, received_args[0], received_args[1], received_args[2], received_args[3], received_args[4], received_args[5]);
+        print_catched_syscall(trace_output_fd, "Detected", get_name_for_syscall_id(syscall_num), argument_num, received_args);
         break;
     }
 

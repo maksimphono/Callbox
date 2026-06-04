@@ -1,4 +1,5 @@
 #include "../include/readers.h"
+#include "../include/print_message.h"
 
 Token_t* read_rules_from_file(Token_t filename) {
     Token_t* rules = NULL;
