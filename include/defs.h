@@ -8,6 +8,8 @@
 
 typedef unsigned long long reg_t; // data type to store value, read from 64-bit registers
 
+typedef unsigned char byte_t;
+
 #define PATH_MAX 200
 
 #define SYSCALL_ARG_TYPES_LENGTH 8

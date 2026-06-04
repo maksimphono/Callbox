@@ -117,7 +117,7 @@ void set_rules_for_syscall_name(char* name, char** arguments, u_int32_t argument
     syscalls_table[syscall_num].action = action;
 
     // TODO: when the argument type is ARRAY_TYPE, check it user specified a string or regex
-    //       if yes: print perform regex matching (if needed) and print it using "printf"
+    //       if yes: perform regex matching (if needed) and print it using "printf"
     //       if no: print all read bytes one by one using "putc"
 
     // TODO: when argument type is PAIR_TYPE: check forbidden values for both 
@@ -290,56 +290,103 @@ bool cmp_syscall_argument(Syscall_argument argument, reg_t value, char* str_valu
     }
 }
 
+byte_t* read_data_from_tracee(pid_t, pid, reg_t addr, size_t length) {
+    long word = 0;
+    size_t sizeof_word = sizeof(word);
+    size_t bytes_read = 0;
+    byte_t* data = (byte_t*)malloc(length * sizeof(byte_t));
+    size_t rem = length;
+    size_t chunk_size = sizeof_word;
+
+    errno = 0;
+    while (bytes_read < length) {
+        word = ptrace(PTRACE_PEEKDATA, pid, (void*)(addr + bytes_read), NULL);
+        if (word == -1 && errno != 0) {
+            // error
+            return NULL;
+        }
+
+        rem = length - bytes_read;
+        chunk_size = (rem >= sizeof_word)? sizeof_word : rem;
+
+        memmove(data + bytes_read, &word, chunk_size);
+
+        bytes_read += chunk_size;
+    }
+
+    return data;
+}
+
+char* read_str_from_tracee(pid_t, pid, reg_t addr) {
+    long word = 0;
+    size_t sizeof_word = sizeof(word);
+    size_t bytes_read = 0;
+    const size_t default_len = 32;
+    char* temp = NULL;
+    char* data = (char*)malloc(default_len * sizeof(char));
+    size_t capacity = default_len;
+    size_t rem = default_len;
+    size_t chunk_size = sizeof_word;
+
+    errno = 0;
+    while (true) {
+        word = ptrace(PTRACE_PEEKDATA, pid, (void*)(addr + bytes_read), NULL);
+        if (word == -1 && errno != 0) {
+            // error
+            free(data);
+            return NULL;
+        }
+
+        if (bytes_read + chunk_size > capacity) {
+            // data won't fit -> resize buffer
+            capacity *= 2;
+            temp = (char*)realloc(data, capacity * sizeof(char));
+            if (temp == NULL) {
+                // out of memory -> retun what was read
+                free(data);
+                return NULL;
+            }
+            data = temp;
+        }
+
+        memmove(data + bytes_read, &word, chunk_size);
+
+        for (int i = 0; i < chunk_size; ++i) {
+            if (data[bytes_read + i] == 0x0) // end of the string
+                return data;
+        }
+
+        bytes_read += chunk_size;
+    }
+}
+
 // TODO: process empty string in the rules and in outputs
 Action_type print_blocked_syscall_arguments(reg_t syscall_num, pid_t pid, struct user_regs_struct regs, int trace_output_fd) {
     const Syscall_arg_type* types = get_syscall_argument_types(syscall_num);
     const reg_t raw_arguments[MAX_SYSCALL_ARGS_NUM] = {regs.rdi, regs.rsi, regs.rdx, regs.r10, regs.r8, regs.r9};
     char* str_arguments[MAX_SYSCALL_ARGS_NUM] = {};
     const u_int32_t DEFAULT_BUFER_LEN = 20;
-    char* buffer = (char*)malloc((DEFAULT_BUFER_LEN + 1) * sizeof(char));
-    const char* syscall_args_print_formats[] = {NULL, "%d", "%u", "%lld", "%llu", "\"%s\"", "0x%llx", "0x%llx"};
+    char* buffer_c = NULL;
+    byte_t* buffer_b = NULL;
+    const char* syscall_args_print_formats[] = {NULL, "%d", "%u", "%lld", "%llu", "\"%s\"", "0x%llx", "0x%llx", "0x%llx", "0x%llx"};
     Action_type required_action = syscalls_table[syscall_num].action; // entering this function automatically means, that syscall is assumed to be blocked
 
     u_int8_t buf_len = 0;
     u_int8_t argument_num = 0;
     u_int8_t i = 0;
 
-    // collect arguments in form of arrays of strings
+    // collect arguments in form of array of Syscall_argument
     for (i = 0; types[i] != ___NONE_TYPE && i < MAX_SYSCALL_ARGS_NUM; i++) {
-        memset(buffer, '\0', DEFAULT_BUFER_LEN + 1);
-        buf_len = 0;
-
         if (types[i] == STRING_TYPE) {
             // collect the string
-            char c = 1;
-            u_int32_t j = 0;
-
-            // TODO: 
-            //  1) improve this by reading all bytes at once (by the next argument)
-            //  2) implement simillar logic but cpecifically for arrays
-            while (c != '\0') {
-                c = ptrace(PTRACE_PEEKDATA, pid, raw_arguments[i] + buf_len * sizeof(char), 0);
-                if (c == -1) {
-                    // error
-                    return required_action;
-                }
-                buf_len++;
-            }
-
-            // resize buffer if needed to capture all characters
-            if (buf_len > DEFAULT_BUFER_LEN) 
-                buffer = (char*)realloc(buffer, (buf_len + 1) * sizeof(char));
-            for (j = 0; j < buf_len; j++) {
-                buffer[j] = ptrace(PTRACE_PEEKDATA, pid, raw_arguments[i] + j * sizeof(char), 0);
-                if (buffer[j] == -1) {
-                    // error
-                    return required_action;
-                }
-            }
-            buffer[buf_len] = '\0';
-
+            str_arguments[i] = read_str_from_tracee(pid, raw_arguments[i]);
+            //sprintf(str_arguments[i], syscall_args_print_formats[types[i]], buffer_c);
+        else if (types[i] == ARRAY_TYPE) {
+            // in regular syscall assuming that the very next argument is a length
+            buffer_b = read_data_from_tracee(pid, raw_arguments[i], (size_t)raw_arguments[i + 1]);
             str_arguments[i] = (char*)malloc((buf_len + 2 + 1) * sizeof(char));
             sprintf(str_arguments[i], syscall_args_print_formats[types[i]], buffer);
+        }
 
         } else {
             // prepare argument for printing according to format
