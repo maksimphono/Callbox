@@ -22,6 +22,17 @@
 #include "tokenize.h"
 #include "sandbox.h"
 
+#define strtohex_or_error(__str, __result, __on_error) \
+do {\
+    char* __endptr; \
+    int32_t __value = strtol(__str, &__endptr, 16); \
+    if ((errno == ERANGE && (__value == LONG_MAX || __value == LONG_MIN)) || __str == __endptr || *__endptr != '\0') {\
+        __on_error \
+    } \
+    else { \
+        __result = __value ; \
+    } \
+} while(false)
 
 #define strtol_or_error(__str, __result, __on_error) \
 do {\

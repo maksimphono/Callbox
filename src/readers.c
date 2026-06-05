@@ -140,6 +140,143 @@ Token next_token(FILE* file) {
     return (Token){TOK_OPERATOR, buffer};
 }
 
+typedef enum {
+    ST_EXPECT_ACTION,
+    ST_EXPECT_NAME,
+    ST_EXPECT_VALUE,
+} Parser_state;
+/*
+typedef struct Array_Node {
+    byte_t value;
+    Array_Node next;
+} Array_Node;
+
+Array_Node* add_node(Array_Node* node, byte_t value) {
+    Array_Node* new = (Array_Node*)malloc(sizeof(Array_Node));
+    new.value = value;
+    new.next = node;
+    return new;
+}
+
+void destroy_nodes(Array_Node* node) {
+    Array_Node* next;
+    while (node != NULL) {
+        next = node->next;
+        free(node);
+        node = next;
+    }
+}
+*/
+byte_t* parse_array(FILE* file, size_t *length) {
+    size_t capacity = 64;
+    size_t len = 0;
+    byte_t* array = (byte_t*)malloc(capacity * sizeof(array));
+    byte_t* temp = NULL;
+    Token tok = next_token(file);
+
+    while (tok.type != TOK_EOF && tok.type != TOK_RBRACE) {
+        if (tok.type == TOK_COMMA){
+            tok = next_token(file);
+            continue;
+        }
+
+        if (len >= capacity) {
+            capacity *= 2;
+            temp = (byte_t*)realloc(array, capacity);
+            if (temp == NULL) {
+                // error
+                return NULL;
+            }
+            array = temp;
+        }
+        if (strncmp(tok.body, "0x", 2) == 0) // hex representation
+            strtohex_or_error(tok.body + 2, array[len], { return NULL; });
+        else
+            strtoul_or_error(tok.body, array[len], { return NULL; });
+        
+        ++len;
+        tok = next_token(file);
+    }
+
+    if (tok.type == TOK_EOF)
+        return NULL;
+
+    if (len < capacity) {
+        temp = (byte_t*)realloc(array, len);
+        if (temp == NULL) {
+            // error
+            return NULL;
+        }
+        array = temp;
+    }
+
+// TODO: figure out why wrong pointer to length is passed
+    *length = len;
+    return array;
+}
+
+void parse_rules_from_file(char* filename) {
+    FILE* file = fopen(filename, "r");
+    Token tok = next_token(file);
+    u_int32_t arguments_number = 0;
+    Syscall_argument arguments[] = {}; // 6 arguments to every rules entry
+    Action_type action = NONE_ACTION;
+    Parser_state state = ST_EXPECT_ACTION;
+    u_int32_t index = 0;
+
+    while (tok.type != TOK_EOF) {
+        switch (tok.type) {
+        case TOK_OPERATOR: {
+            if (strncmp(tok.body, "arg", 3) == 0) {
+                state = ST_EXPECT_VALUE;
+                strtoul_or_error(tok.body + 3, index, {
+                    // error, misformatted argument number 
+                    return;
+                });
+                if (next_token(file).type != TOK_EQ_SIGN) {
+                    // error
+                    return;
+                }
+            }
+            break;
+        }
+        case TOK_REGEX:
+        case TOK_STRING: {
+            if (not(ST_EXPECT_VALUE)) {
+                // error, not expecting value
+                return;
+            }
+            arguments[index].type = STRING_TYPE;
+            arguments[index].str = tok.body;
+            arguments[index].is_regex = (tok.type == TOK_REGEX);
+            break;
+        }
+        case TOK_NUMBER: {
+            if (not(ST_EXPECT_VALUE)) {
+                // error, not expecting value
+                return;
+            }
+            arguments[index].type = OTHER_TYPE; // just uint64 by default, will be converted later
+            arguments[index].str = tok.body;
+            break;
+        }
+        case TOK_LBRACE:
+            // reading array
+            if (not(ST_EXPECT_VALUE)) {
+                // error, not expecting value
+                return;
+            }
+            arguments[index].type = ARRAY_TYPE;
+            arguments[index].arr = parse_array(file, &(arguments[index].arr_len));
+            break;
+        }
+        tok = next_token(file);
+    }
+    //set_rules_for_syscall_name(syscall_name, arguments, arguments_number, action);
+
+    fclose(file);
+}
+
 Token_t* read_rules_from_file(Token_t filename) {
     Token_t* rules = NULL;
     u_int32_t rules_len = 0;
