@@ -14,7 +14,8 @@ typedef enum {
     TOK_EQ_SIGN,    // =
     TOK_OPERATOR,   // argX OR deny OR notify...
     TOK_NUMBER,     // 123
-    TOK_STRING,     // qwerty
+    TOK_STRING,     // string
+    TOK_REGEX,      // regular expression
     TOK_ENDL,       // \n
     TOK_EOF,        // EOF
     TOK_ERR         // ERROR

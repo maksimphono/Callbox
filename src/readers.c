@@ -1,9 +1,62 @@
 #include "../include/readers.h"
 #include "../include/print_message.h"
 
+char esc_char(char ch) {
+    switch(ch) {
+    case 'a':  return '\a';
+    case 'b':  return '\b';
+    case 'e':  return '\e';
+    case 'f':  return '\f';
+    case 'n':  return '\n';
+    case 'r':  return '\r';
+    case 't':  return '\t';
+    case 'v':  return '\v';
+    case '\\': return '\\';
+    case '\'': return '\'';
+    case '\"': return '\"';
+    case '\?': return '\?';
+    case ' ':  return ' ';
+    default:   return -1; // invalid escape sequence
+    }
+}
 
-char* lex_string(FILE* file) {
-    return NULL;
+char* lex_string(FILE* file, char brk) {
+    int capacity = 20;
+    int len = 0;
+    char* temp;
+    char* string = (char*)malloc(len * sizeof(char));
+    char ch = getc(file);
+
+    while (ch != EOF && ch != brk) {
+        if (len >= capacity) {
+            capacity *= 2;
+            temp = (char*)realloc(string, capacity + 1);
+            if (temp == NULL) {
+                free(string);
+                return NULL;
+            }
+            string = temp;
+        }
+        if (IS_ESC_SEQ(ch)) { // escape sequence
+            ch = getc(file);
+            ch = esc_char(ch);
+            if (ch == -1) return NULL;
+        }
+        string[len] = ch;
+        ++len;
+        ch = getc(file);
+    }
+
+    if (ch == EOF) {
+        // string wasn't closed
+        free(string);
+        return NULL; 
+    }
+
+    string[len] = '\0';
+
+    return string;
+
 }
 
 bool is_digit(char ch) {
@@ -36,7 +89,12 @@ Token next_token(FILE* file) {
 
     if (ch == EOF) return (Token){ TOK_EOF, NULL };
 
-    if (ch == '"') return (Token){ TOK_STRING, lex_string(file) };
+    if (ch == '"' || ch == '/') { // regex is marked with '/'
+        // regex of string
+        char* str = lex_string(file, ch);
+        if (str == NULL) return (Token){TOK_ERR, NULL};
+        return (ch == '"') ? (Token){ TOK_STRING, str } : (Token){ TOK_REGEX, str };
+    }
 
     switch (ch) {
     case ':': return (Token){TOK_COLON,   NULL};
