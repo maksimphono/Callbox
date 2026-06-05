@@ -1,6 +1,87 @@
 #include "../include/readers.h"
 #include "../include/print_message.h"
 
+
+char* lex_string(FILE* file) {
+    return NULL;
+}
+
+bool is_digit(char ch) {
+    return ('0' <= ch && ch <= '9') || ('a' <= ch && ch <= 'f');
+}
+
+bool is_stopper(char ch) {
+    // stopper is a character, that indicates, that parsing current token should
+    // be stopped, like ',' or '\n'...
+    switch (ch) {
+    case ',':  return true;
+    case ':':  return true;
+    case '=':  return true;
+    case '\n': return true;
+    case ' ':  return true;
+    case '\t': return true;
+    case '{':  return true;
+    case '}':  return true;
+    default:   return false;
+    }
+}
+
+Token next_token(FILE* file) {
+    char ch = getc(file);
+
+    while (ch != EOF && (ch == ' ' || ch == '\t')) {
+        // skipping spaces and tabs
+        ch = getc(file);
+    }
+
+    if (ch == EOF) return (Token){ TOK_EOF, NULL };
+
+    if (ch == '"') return (Token){ TOK_STRING, lex_string(file) };
+
+    switch (ch) {
+    case ':': return (Token){TOK_COLON,   NULL};
+    case '{': return (Token){TOK_LBRACE,  NULL};
+    case '}': return (Token){TOK_RBRACE,  NULL};
+    case ',': return (Token){TOK_COMMA,   NULL};
+    case '=': return (Token){TOK_EQ_SIGN, NULL};
+    case '\n':return (Token){TOK_ENDL,    NULL};
+    }
+
+    // parse number or operator
+    char* buffer = (char*)malloc(21);
+    char* temp;
+    bool parsing_number = true; // assuming that the token is a number at first
+    int capacity = 20;
+    int len = 0;
+    while (ch != EOF && not(is_stopper(ch))) {
+        if (is_digit(ch) || (len == 1 && ch == 'x')) { // it's a regular number of a hex number written as 0x123...
+        } else {
+            // not parsing a number, it's likely an operator
+            parsing_number = false;
+        }
+        if (len >= capacity) {
+            capacity *= 2;
+            temp = (char*)realloc(buffer, capacity + 1);
+            if (temp == NULL) {
+                free(buffer);
+                return (Token){TOK_ERR, NULL};
+            }
+            buffer = temp;
+        }
+        buffer[len] = ch;
+        ++len;
+        ch = getc(file);
+    }
+
+    buffer[len] = '\0'; // null-terminated
+    if (is_stopper(ch)) 
+        // it's a stopper - returning it back to the stream to read on the next call
+        ungetc(ch, file);
+
+    if (parsing_number) return (Token){TOK_NUMBER, buffer};
+    return (Token){TOK_OPERATOR, buffer};
+}
+
 Token_t* read_rules_from_file(Token_t filename) {
     Token_t* rules = NULL;
     u_int32_t rules_len = 0;
