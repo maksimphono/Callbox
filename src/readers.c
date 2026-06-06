@@ -140,11 +140,6 @@ Token next_token(FILE* file) {
     return (Token){TOK_OPERATOR, buffer};
 }
 
-typedef enum {
-    ST_EXPECT_ACTION,
-    ST_EXPECT_NAME,
-    ST_EXPECT_VALUE,
-} Parser_state;
 /*
 typedef struct Array_Node {
     byte_t value;
@@ -167,6 +162,14 @@ void destroy_nodes(Array_Node* node) {
     }
 }
 */
+
+typedef enum {
+    ST_EXPECT_ACTION,
+    ST_EXPECT_NAME,
+    ST_EXPECT_ARGN,
+    ST_EXPECT_VALUE,
+} Parser_state;
+
 byte_t* parse_array(FILE* file, size_t *length) {
     size_t capacity = 64;
     size_t len = 0;
@@ -199,6 +202,7 @@ byte_t* parse_array(FILE* file, size_t *length) {
     }
 
     if (tok.type == TOK_EOF)
+        // error: array wasn't closed
         return NULL;
 
     if (len < capacity) {
@@ -222,58 +226,107 @@ void parse_rules_from_file(char* filename) {
     Syscall_argument arguments[] = {EMPTY_RULES, EMPTY_RULES, EMPTY_RULES, EMPTY_RULES, EMPTY_RULES, EMPTY_RULES}; // 6 arguments to every rules entry
     Action_type action = NONE_ACTION;
     Parser_state state = ST_EXPECT_ACTION;
+    char* syscall_name = NULL;
     u_int32_t index = 0;
 
     while (tok.type != TOK_EOF) {
         switch (tok.type) {
+        case TOK_COMMA:
+            break;
+        case TOK_ENDL: {
+            // done parsing this syscall rules
+            if (state == ST_EXPECT_ACTION && action == NONE_ACTION) {
+                // the line is likely empty -> skip
+                break;
+            }
+            if (action == NONE_ACTION || syscall_name == NULL) {
+                // error: can't parse action or name
+                return;
+            }
+            //set_rules_for_syscall_name(syscall_name, arguments, arguments_number, action);
+
+            action = NONE_ACTION;
+            state = ST_EXPECT_ACTION;
+            index = 0;
+            arguments_number = 0;
+            memset(arguments, 0x0, 6 * sizeof(Syscall_argument));
+            break;
+        }
         case TOK_OPERATOR: {
-            if (strncmp(tok.body, "arg", 3) == 0) {
+            if (state == ST_EXPECT_ACTION) {
+                state = ST_EXPECT_NAME;
+
+                if (strcmp(tok.body, "filter") == 0) {
+                    action = FILTER;
+                } else if (strcmp(tok.body, "deny") == 0) {
+                    action = BLOCK;
+                } else if (strcmp(tok.body, "notify") == 0) {
+                    action = NOTIFY;
+                } else {
+                    // error: wrong action
+                    return;
+                }
+                if (next_token(file).type != TOK_COLON) {
+                    // error, missing sepqrator ':'
+                    return;
+                }
+                break;
+            } else if (state == ST_EXPECT_ARGN && strncmp(tok.body, "arg", 3) == 0) {
                 state = ST_EXPECT_VALUE;
                 strtoul_or_error(tok.body + 3, index, {
-                    // error, misformatted argument number 
+                    // error: misformatted argument number 
                     return;
                 });
                 if (next_token(file).type != TOK_EQ_SIGN) {
-                    // error
+                    // error: missing argument comparison operator ('=')
                     return;
                 }
+            } else if (state == ST_EXPECT_NAME) {
+                state = ST_EXPECT_ARGN;
+                syscall_name = tok.body;
             }
             break;
         }
         case TOK_REGEX:
         case TOK_STRING: {
-            if (not(ST_EXPECT_VALUE)) {
+            if (state != ST_EXPECT_VALUE) {
                 // error, not expecting value
                 return;
             }
+            state = ST_EXPECT_ARGN;
+
             arguments[index].type = STRING_TYPE;
             arguments[index].str = tok.body;
             arguments[index].is_regex = (tok.type == TOK_REGEX);
             break;
         }
         case TOK_NUMBER: {
-            if (not(ST_EXPECT_VALUE)) {
+            if (state != ST_EXPECT_VALUE) {
                 // error, not expecting value
                 return;
             }
+            state = ST_EXPECT_ARGN;
+
             arguments[index].type = OTHER_TYPE; // just uint64 by default, will be converted later
             arguments[index].str = tok.body;
             break;
         }
-        case TOK_LBRACE:
+        case TOK_LBRACE: {
             // reading array
-            if (not(ST_EXPECT_VALUE)) {
+            if (state != ST_EXPECT_VALUE) {
                 // error, not expecting value
                 return;
             }
+            state = ST_EXPECT_ARGN;
+
             arguments[index].type = ARRAY_TYPE;
             byte_t* arr = parse_array(file, &arguments[index].arr_len);
             arguments[index].arr = arr;
             break;
         }
+        }
         tok = next_token(file);
     }
-    //set_rules_for_syscall_name(syscall_name, arguments, arguments_number, action);
 
     fclose(file);
 }
