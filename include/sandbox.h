@@ -115,7 +115,7 @@ void clean_syscall_rules();
 void reset_syscall_rules();
 
 // Will set rules for the syscall by provided name
-void set_rules_for_syscall_name(char* name, char** arguments, u_int32_t arguments_length, Action_type);
+void set_rules_for_syscall_name(char* name, Syscall_argument arguments[], u_int32_t arguments_length, Action_type);
 
 Action_type print_blocked_syscall_arguments(reg_t syscall_num, pid_t pid, struct user_regs_struct regs, int);
 

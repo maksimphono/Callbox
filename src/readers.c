@@ -243,7 +243,7 @@ void parse_rules_from_file(char* filename) {
                 // error: can't parse action or name
                 return;
             }
-            //set_rules_for_syscall_name(syscall_name, arguments, arguments_number, action);
+            set_rules_for_syscall_name(syscall_name, arguments, arguments_number, action);
 
             action = NONE_ACTION;
             state = ST_EXPECT_ACTION;
@@ -273,6 +273,7 @@ void parse_rules_from_file(char* filename) {
                 break;
             } else if (state == ST_EXPECT_ARGN && strncmp(tok.body, "arg", 3) == 0) {
                 state = ST_EXPECT_VALUE;
+                ++arguments_number;
                 strtoul_or_error(tok.body + 3, index, {
                     // error: misformatted argument number 
                     return;
@@ -284,6 +285,9 @@ void parse_rules_from_file(char* filename) {
             } else if (state == ST_EXPECT_NAME) {
                 state = ST_EXPECT_ARGN;
                 syscall_name = tok.body;
+            } else {
+                // error: wrong rule entry format
+                return;
             }
             break;
         }
@@ -301,13 +305,14 @@ void parse_rules_from_file(char* filename) {
             break;
         }
         case TOK_NUMBER: {
+            // TODO: parse negative numbers as well
             if (state != ST_EXPECT_VALUE) {
                 // error, not expecting value
                 return;
             }
             state = ST_EXPECT_ARGN;
 
-            arguments[index].type = OTHER_TYPE; // just uint64 by default, will be converted later
+            arguments[index].type = UINT_64_TYPE; // just uint64 by default, will be converted to the actual type later
             arguments[index].str = tok.body;
             break;
         }
@@ -330,7 +335,7 @@ void parse_rules_from_file(char* filename) {
 
     fclose(file);
 }
-
+/*
 Token_t* read_rules_from_file(Token_t filename) {
     Token_t* rules = NULL;
     u_int32_t rules_len = 0;
@@ -397,3 +402,4 @@ Token_t* read_rules_from_file(Token_t filename) {
 
     fclose(rules_file);
 }
+*/

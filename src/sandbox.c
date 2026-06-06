@@ -93,7 +93,7 @@ void record_syscall_with_rules(u_int32_t syscall_num) {
 
 // Will set rules for the syscall by provided name
 // arguments must be in exact order (argument 0, argument 1, argument 2...)
-void set_rules_for_syscall_name(char* name, char** arguments, u_int32_t arguments_length, Action_type action) {
+void set_rules_for_syscall_name(char* name, Syscall_argument arguments[], u_int32_t arguments_length, Action_type action) {
     Syscall_argument* rules = NULL;
     u_int32_t i = 0;
 
@@ -138,11 +138,10 @@ void set_rules_for_syscall_name(char* name, char** arguments, u_int32_t argument
         switch (rules[i].type) {
         case ADDRESS_TYPE:
             // assuming address starts with "0x" (16-base int), starting scanning number from second position
-            if (check_regex(arguments[i], "^0x[0-9a-fA-F]+$") == 0) {
-                rules[i].addr[0] = (uintptr_t)strtoull(arguments[i], &endptr, 16);
-                rules[i].addr[1] = (uintptr_t)strtoull(arguments[i], &endptr, 16);
-            } else if (check_regex(arguments[i], "^0x[0-9a-fA-F]+-0x[0-9a-fA-F]+$") == 0) {
-                sscanf(arguments[i], "0x%llx-0x%llx", &rules[i].addr[0], &rules[i].addr[1]);
+            if (arguments[i].type == UINT_64_TYPE) {
+                rules[i].addr[0] = rules[i].addr[1] = (uintptr_t)strtoull(arguments[i].str, &endptr, 16);
+            } else if (check_regex(arguments[i].str, "^0x[0-9a-fA-F]+-0x[0-9a-fA-F]+$") == 0) {
+                sscanf(arguments[i].str, "0x%llx-0x%llx", &rules[i].addr[0], &rules[i].addr[1]);
             } else {
                 rules[i].addr[0] = 0;
                 rules[i].addr[1] = 0;
@@ -151,7 +150,8 @@ void set_rules_for_syscall_name(char* name, char** arguments, u_int32_t argument
             break;
         case UINT_64_TYPE:{
             u_int64_t value = ULLONG_MAX;
-            strtoull_or_error(arguments[i], value, {
+            strtoull_or_error(arguments[i].str, value, {
+                // probably wrong type was specified
                 continue;
             });
             rules[i].uint64 = value;
@@ -159,7 +159,8 @@ void set_rules_for_syscall_name(char* name, char** arguments, u_int32_t argument
         }
         case UINT_32_TYPE: {
             u_int32_t value = ULONG_MAX;
-            strtoul_or_error(arguments[i], value, {
+            strtoul_or_error(arguments[i].str, value, {
+                // probably wrong type was specified
                 continue;
             });
             rules[i].uint32 = value;
@@ -167,7 +168,8 @@ void set_rules_for_syscall_name(char* name, char** arguments, u_int32_t argument
         }
         case INT_32_TYPE: {
             int32_t value = LONG_MAX;
-            strtol_or_error(arguments[i], value, {
+            strtol_or_error(arguments[i].str, value, {
+                // probably wrong type was specified
                 continue;
             });
             rules[i].int32 = value;
@@ -175,43 +177,33 @@ void set_rules_for_syscall_name(char* name, char** arguments, u_int32_t argument
         }
         case INT_64_TYPE: {
             int64_t value = LLONG_MAX;
-            strtoll_or_error(arguments[i], value, {
+            strtoll_or_error(arguments[i].str, value, {
+                // probably wrong type was specified
                 continue;
             });
             rules[i].int64 = value;
             break;
         }
         case STRING_TYPE: {
-            size_t len = strlen(arguments[i]);
-
-            if (arguments[i][0] == 'r') {
-                rules[i].is_regex = true;
-                rules[i].str = (char*)malloc((len - 2) * sizeof(char));
-                strncpy_with_esc(rules[i].str, arguments[i] + 2, len - 3);
-            } else {
-                rules[i].is_regex = false;
-                rules[i].str = (char*)malloc((len - 1) * sizeof(char));
-                // accounting for quotation marks (") at the start and end of string
-                strncpy_with_esc(rules[i].str, arguments[i] + 1, len - 2);
+            if (arguments[i].type != STRING_TYPE) {
+                // error: string expected
+                return;
             }
-
+            rules[i] = arguments[i];
             break;
         }
         case ARRAY_TYPE: {
             // TODO: parse provided byte array
-            rules[i].arr = (byte_t*)malloc(7);
-            rules[i].arr[0] = 'q';
-            rules[i].arr[1] = 'A';
-            rules[i].arr[2] = ' ';
-            rules[i].arr[3] = ' ';
-            rules[i].arr[4] = 'w';
-            rules[i].arr[5] = 'e';
-            rules[i].arr[6] = '\n';
-            rules[i].arr_len = 7;
+            if (arguments[i].type != ARRAY_TYPE) {
+                // error: array expected
+                return;
+            }
+
+            rules[i] = arguments[i];
             break;
         }
         default: {
-            rules[i].other = (void*)arguments[i];
+            rules[i] = arguments[i];
             break;
         }
         }

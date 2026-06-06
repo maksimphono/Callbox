@@ -177,7 +177,7 @@ CommandExecutionResult_t* execute_commands_workflow(Token_t* tokens, u_int32_t t
         prev_pipe_read_fd = open(cli_arguments->input_file, O_RDONLY);
 
     if (cli_arguments->rules_file != NULL)
-        read_rules_from_file(cli_arguments->rules_file);
+        parse_rules_from_file(cli_arguments->rules_file);
     else
         print_empty_rules();
 
