@@ -273,7 +273,6 @@ void parse_rules_from_file(char* filename) {
                 break;
             } else if (state == ST_EXPECT_ARGN && strncmp(tok.body, "arg", 3) == 0) {
                 state = ST_EXPECT_VALUE;
-                ++arguments_number;
                 strtoul_or_error(tok.body + 3, index, {
                     // error: misformatted argument number 
                     return;
@@ -282,6 +281,7 @@ void parse_rules_from_file(char* filename) {
                     // error: missing argument comparison operator ('=')
                     return;
                 }
+                if (arguments_number < index) arguments_number = index;
             } else if (state == ST_EXPECT_NAME) {
                 state = ST_EXPECT_ARGN;
                 syscall_name = tok.body;

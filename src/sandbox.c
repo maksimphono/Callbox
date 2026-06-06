@@ -136,6 +136,9 @@ void set_rules_for_syscall_name(char* name, Syscall_argument arguments[], u_int3
         rules[arguments_length].type = ___NONE_TYPE; // must be none-terminated
 
         switch (rules[i].type) {
+        case ___NONE_TYPE:
+            // if argument wasn't specified - just skip
+            continue;
         case ADDRESS_TYPE:
             // assuming address starts with "0x" (16-base int), starting scanning number from second position
             if (arguments[i].type == UINT_64_TYPE) {
@@ -194,7 +197,7 @@ void set_rules_for_syscall_name(char* name, Syscall_argument arguments[], u_int3
         }
         case ARRAY_TYPE: {
             // TODO: parse provided byte array
-            if (arguments[i].type != ARRAY_TYPE) {
+            if (arguments[i].type != ARRAY_TYPE && arguments[i].type != STRING_TYPE) {
                 // error: array expected
                 return;
             }
@@ -373,6 +376,7 @@ Action_type print_blocked_syscall_arguments(reg_t syscall_num, pid_t pid, struct
     const Syscall_arg_type* types = get_syscall_argument_types(syscall_num);
     const reg_t raw_arguments[MAX_SYSCALL_ARGS_NUM] = {regs.rdi, regs.rsi, regs.rdx, regs.r10, regs.r8, regs.r9};
     Syscall_argument received_args[MAX_SYSCALL_ARGS_NUM] = {};
+    Syscall_argument* rules = get_rules_for_syscall_id(syscall_num);
     const char* syscall_args_print_formats[] = {NULL, "%d", "%u", "%lld", "%llu", "\"%s\"", "0x%llx", "0x%llx", "0x%llx", "0x%llx"};
     Action_type required_action = syscalls_table[syscall_num].action; // entering this function automatically means, that syscall is assumed to be blocked
 
@@ -391,8 +395,19 @@ Action_type print_blocked_syscall_arguments(reg_t syscall_num, pid_t pid, struct
         }
         case (ARRAY_TYPE): {
             // in regular syscall assuming that the very next argument is a length
-            received_args[i].arr_len = (size_t)raw_arguments[i + 1];
-            received_args[i].arr = read_data_from_tracee(pid, raw_arguments[i], received_args[i].arr_len);
+            if (rules[i].type == STRING_TYPE) {
+                // type array floats into type string if user specified so
+                received_args[i].type = STRING_TYPE;
+                received_args[i].str = read_str_from_tracee(pid, raw_arguments[i]);
+                received_args[i].is_regex = rules[i].is_regex;
+            } else if (rules[i].type == ARRAY_TYPE) {
+                received_args[i].arr_len = (size_t)raw_arguments[i + 1];
+                received_args[i].arr = read_data_from_tracee(pid, raw_arguments[i], received_args[i].arr_len);
+            } else {
+                // error: wrong argument type
+                return NONE_ACTION;
+            }
+            
             //received_args[i] = (char*)malloc((buf_len + 2 + 1) * sizeof(char));
             //sprintf(received_args[i], syscall_args_print_formats[types[i]], buffer);
             break;
@@ -407,19 +422,26 @@ Action_type print_blocked_syscall_arguments(reg_t syscall_num, pid_t pid, struct
     }
     argument_num = i;
 
-    // check if syscall arguments actually are forbidden
-    if (get_rules_for_syscall_id(syscall_num) != &EMPTY_RULES) {
-        for (i = 0; i < argument_num && get_rules_for_syscall_id(syscall_num)[i].type != ___NONE_TYPE; i++) {
-            Syscall_argument* arg = &get_rules_for_syscall_id(syscall_num)[i];
-            if (not(cmp_syscall_argument(arg, &received_args[i]))) {
-                // arguments don't match -> do nothing
-                required_action = NONE_ACTION;
-                break;
-            }
-
+    for (i = 0; types[i] != ___NONE_TYPE && i < MAX_SYSCALL_ARGS_NUM; i++) {
+        if (rules[i].type != ___NONE_TYPE && 
+            cmp_syscall_argument(&rules[i], &received_args[i]) == false
+        ) {
+            // arguments don't match -> do nothing
+            required_action = NONE_ACTION;
+            break;
         }
     }
-
+/*
+    // check if syscall arguments actually are forbidden
+    for (i = 0; i < argument_num && get_rules_for_syscall_id(syscall_num)[i].type != ___NONE_TYPE; i++) {
+        Syscall_argument* arg = &get_rules_for_syscall_id(syscall_num)[i];
+        if (not(cmp_syscall_argument(arg, &received_args[i]))) {
+            // arguments don't match -> do nothing
+            required_action = NONE_ACTION;
+            break;
+        }
+    }
+*/
     switch (required_action) {
     case BLOCK:
         print_catched_syscall(trace_output_fd, "Blocked", get_name_for_syscall_id(syscall_num), argument_num, received_args);
