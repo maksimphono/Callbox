@@ -219,7 +219,7 @@ void parse_rules_from_file(char* filename) {
     FILE* file = fopen(filename, "r");
     Token tok = next_token(file);
     u_int32_t arguments_number = 0;
-    Syscall_argument arguments[] = {}; // 6 arguments to every rules entry
+    Syscall_argument arguments[] = {EMPTY_RULES, EMPTY_RULES, EMPTY_RULES, EMPTY_RULES, EMPTY_RULES, EMPTY_RULES}; // 6 arguments to every rules entry
     Action_type action = NONE_ACTION;
     Parser_state state = ST_EXPECT_ACTION;
     u_int32_t index = 0;
@@ -267,7 +267,8 @@ void parse_rules_from_file(char* filename) {
                 return;
             }
             arguments[index].type = ARRAY_TYPE;
-            arguments[index].arr = parse_array(file, &(arguments[index].arr_len));
+            byte_t* arr = parse_array(file, &arguments[index].arr_len);
+            arguments[index].arr = arr;
             break;
         }
         tok = next_token(file);

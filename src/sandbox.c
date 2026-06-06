@@ -47,7 +47,7 @@ void clean_arguments(Syscall_argument* arguments) {
                 free(arguments[i].str);
             else if (arguments[i].type == ARRAY_TYPE)
                 free(arguments[i].arr);
-            //free(arguments[i]);
+           //free(arguments[i]);
         }
         free(arguments);
     }
