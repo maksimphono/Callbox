@@ -20,22 +20,31 @@ void print_empty_rules() {
     fflush(stdout);
 }
 
+
+void print_byte(int fd, byte_t byte) {
+    if (isprint(byte)) {
+        dprintf(fd, "'%c'", byte);
+    } else {
+        switch (byte) {
+        case '\n': dprintf(fd, "'\\n'"); break;
+        case '\t': dprintf(fd, "'\\t'"); break;
+        case '\0': dprintf(fd, "'\\0'"); break;
+        case '\r': dprintf(fd, "'\\r'"); break;
+        default: dprintf(fd, "\\x%02x", byte);
+        }
+    }
+}
+
 void print_single_syscall_argument(int fd, Syscall_argument* arg){
     if (arg->type == ARRAY_TYPE) {
-        for (size_t i = 0; i < arg->arr_len; ++i) {
-            if (isprint(arg->arr[i])) {
-                dprintf(fd, "%c", arg->arr[i]);
-            } else {
-                switch (arg->arr[i]) {
-                case '\n': dprintf(fd, "\\n"); break;
-                case '\t': dprintf(fd, "\\t"); break;
-                case '\0': dprintf(fd, "\\0"); break;
-                case '\r': dprintf(fd, "\\r"); break;
-                default: dprintf(fd, "\\x%02x", arg->arr[i]);
-                }
-            }
-        
+        size_t i = 0;
+        dprintf(fd, "{ ");
+        for (; i < arg->arr_len - 1; i++) {
+            print_byte(fd, arg->arr[i]);
+            dprintf(fd, ", ");
         }
+        print_byte(fd, arg->arr[i]);
+        dprintf(fd, " }");
 
         return;
     }
@@ -48,8 +57,26 @@ void print_single_syscall_argument(int fd, Syscall_argument* arg){
     case UINT_64_TYPE: { dprintf(fd, fmt, arg->uint64);  break; }
     case INT_64_TYPE:  { dprintf(fd, fmt, arg->int64);   break; }
     case INT_32_TYPE:  { dprintf(fd, fmt, arg->int32);   break; }
-    case STRING_TYPE:  { dprintf(fd, fmt, arg->str);     break; }
     case ADDRESS_TYPE: { dprintf(fd, fmt, arg->addr[0]); break; }
+    case STRING_TYPE:  { 
+        dprintf(fd, "\"");
+        for (size_t i = 0; arg->str[i] != '\0'; i++) {
+            if (isprint(arg->str[i])) {
+                dprintf(fd, "%c", arg->str[i]);
+            } else {
+                switch (arg->str[i]) {
+                case '\n': dprintf(fd, "\\n"); break;
+                case '\t': dprintf(fd, "\\t"); break;
+                case '\r': dprintf(fd, "\\r"); break;
+                default: dprintf(fd, "?");
+                }
+            }
+            
+        }
+        dprintf(fd, "\"");
+        break; 
+    }
+    
     }
 }
 
