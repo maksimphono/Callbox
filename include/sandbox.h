@@ -13,7 +13,7 @@
 #include "defs.h"
 #include "utils.h"
 
-typedef enum {SUCCESS, UNKNOWN_ERROR, BLOCKED_SYSCALL, FILTERED_SYSCALL, NOTIFIED_SYSCALL} Trace_result;
+typedef enum {SUCCESS, UNKNOWN_ERROR, BLOCKED_SYSCALL} Trace_result;
 typedef enum {
     ___NONE_TYPE = 0,
     INT_32_TYPE  = 1, 

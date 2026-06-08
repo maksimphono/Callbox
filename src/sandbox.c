@@ -138,7 +138,7 @@ void set_rules_for_syscall_name(char* name, Syscall_argument arguments[], u_int3
 
         switch (rules[i].type) {
         case ___NONE_TYPE:
-            // if argument wasn't specified - just skip
+            // if argument wasn't specified -> just skip
             switch (arguments[i].type) {
             case UINT_64_TYPE:
             case STRING_TYPE: {
@@ -307,7 +307,6 @@ bool cmp_syscall_argument(Syscall_argument* argument, Syscall_argument* received
 
     }
     case ARRAY_TYPE: {
-        // TODO: implement array comparison logic
         if (argument->arr_len != received_arg->arr_len) return false;
         return (memcmp(argument->arr, received_arg->arr, received_arg->arr_len * sizeof(byte_t)) == 0);
     }
@@ -319,7 +318,7 @@ bool cmp_syscall_argument(Syscall_argument* argument, Syscall_argument* received
 
 byte_t* read_data_from_tracee(pid_t pid, reg_t addr, size_t length) {
     long word = 0;
-    size_t sizeof_word = sizeof(word);
+    const size_t sizeof_word = sizeof(word);
     size_t bytes_read = 0;
     byte_t* data = (byte_t*)malloc(length * sizeof(byte_t));
     size_t rem = length;
@@ -329,8 +328,7 @@ byte_t* read_data_from_tracee(pid_t pid, reg_t addr, size_t length) {
     while (bytes_read < length) {
         word = ptrace(PTRACE_PEEKDATA, pid, (void*)(addr + bytes_read), NULL);
         if (word == -1 && errno != 0) {
-            // error
-            return NULL;
+            goto err;
         }
 
         rem = length - bytes_read;
@@ -342,15 +340,18 @@ byte_t* read_data_from_tracee(pid_t pid, reg_t addr, size_t length) {
     }
 
     return data;
+
+err:
+    free(data);
+    return NULL;
 }
 
 char* read_str_from_tracee(pid_t pid, reg_t addr) {
     long word = 0;
-    size_t sizeof_word = sizeof(word);
-    size_t bytes_read = 0;
+    const size_t sizeof_word = sizeof(word);
     const size_t default_len = 32;
-    char* temp = NULL;
     char* data = (char*)malloc(default_len * sizeof(char));
+    size_t bytes_read = 0;
     size_t capacity = default_len;
     size_t rem = default_len;
     size_t chunk_size = sizeof_word;
@@ -359,21 +360,16 @@ char* read_str_from_tracee(pid_t pid, reg_t addr) {
     while (true) {
         word = ptrace(PTRACE_PEEKDATA, pid, (void*)(addr + bytes_read), NULL);
         if (word == -1 && errno != 0) {
-            // error
-            free(data);
-            return NULL;
+            goto err;
         }
 
         if (bytes_read + chunk_size > capacity) {
             // data won't fit -> resize buffer
             capacity *= 2;
-            temp = (char*)realloc(data, capacity * sizeof(char));
-            if (temp == NULL) {
-                // out of memory -> retun what was read
-                free(data);
-                return NULL;
-            }
-            data = temp;
+            data = (char*)realloc_or_err(data, capacity * sizeof(char), {
+                // error: out of memory
+                goto err;
+            });
         }
 
         memmove(data + bytes_read, &word, chunk_size);
@@ -385,6 +381,11 @@ char* read_str_from_tracee(pid_t pid, reg_t addr) {
 
         bytes_read += chunk_size;
     }
+    return data;
+
+err:
+    free(data);
+    return NULL;
 }
 
 // TODO: process empty string in the rules and in outputs

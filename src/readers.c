@@ -23,7 +23,6 @@ char esc_char(char ch) {
 char* lex_string(FILE* file, char brk) {
     int capacity = 20;
     int len = 0;
-    char* temp;
     char* string = (char*)malloc(capacity * sizeof(char));
     char ch = getc(file);
 
@@ -105,10 +104,9 @@ Token next_token(FILE* file) {
     }
 
     // parse number or operator
-    char* buffer = (char*)malloc(21);
-    char* temp;
-    bool parsing_number = true; // assuming that the token is a number at first
     int capacity = 20;
+    char* buffer = (char*)malloc(capacity * sizeof(char));
+    bool parsing_number = true; // assuming that the token is a number at first
     int len = 0;
     while (ch != EOF && not(is_stopper(ch))) {
         if (is_digit(ch) || (len == 1 && ch == 'x')) { // it's a regular number of a hex number written as 0x123...
@@ -174,10 +172,12 @@ byte_t* parse_array(FILE* file, size_t *length) {
     size_t capacity = 64;
     size_t len = 0;
     byte_t* array = (byte_t*)malloc(capacity * sizeof(byte_t));
-    byte_t* temp = NULL;
     Token tok = next_token(file);
 
     while (tok.type != TOK_EOF && tok.type != TOK_RBRACE) {
+        if (tok.type == TOK_ERR) {
+            goto err;
+        }
         if (tok.type == TOK_COMMA){
             tok = next_token(file);
             continue;
@@ -230,6 +230,8 @@ void parse_rules_from_file(char* filename) {
 
     while (tok.type != TOK_EOF) {
         switch (tok.type) {
+        case TOK_ERR:
+            goto err;
         case TOK_COMMA:
             break;
         case TOK_ENDL: {
