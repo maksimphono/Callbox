@@ -121,12 +121,9 @@ void set_rules_for_syscall_name(char* name, Syscall_argument arguments[], u_int3
 
     // create new rules
     rules = (Syscall_argument*)malloc((arguments_length + 1) * sizeof(Syscall_argument));
+    rules[arguments_length] = EMPTY_RULES; // must be none-terminated
     syscalls_table[syscall_num].rules = rules;
     syscalls_table[syscall_num].action = action;
-
-    // TODO: when the argument type is ARRAY_TYPE, check it user specified a string or regex
-    //       if yes: perform regex matching (if needed) and print it using "printf"
-    //       if no: print all read bytes one by one using "putc"
 
     // TODO: when argument type is PAIR_TYPE: check forbidden values for both 
 
@@ -135,12 +132,22 @@ void set_rules_for_syscall_name(char* name, Syscall_argument arguments[], u_int3
         char *endptr = NULL;
         printf("Setting up argument\n");
 
+        if (arguments[i].type == ___NONE_TYPE) continue; // skipping argument that wasn't specicified
+
         rules[i].type = syscalls_table[syscall_num].arg_types[i];
-        rules[arguments_length].type = ___NONE_TYPE; // must be none-terminated
 
         switch (rules[i].type) {
         case ___NONE_TYPE:
             // if argument wasn't specified - just skip
+            switch (arguments[i].type) {
+            case UINT_64_TYPE:
+            case STRING_TYPE: {
+                free(arguments[i].str);
+                break;
+            }
+            case ARRAY_TYPE:
+                free(arguments[i].arr);
+            }
             continue;
         case ADDRESS_TYPE:
             // assuming address starts with "0x" (16-base int), starting scanning number from second position
@@ -409,7 +416,7 @@ Action_type print_blocked_syscall_arguments(reg_t syscall_num, pid_t pid, struct
                 received_args[i].type = STRING_TYPE;
                 received_args[i].str = read_str_from_tracee(pid, raw_arguments[i]);
                 received_args[i].is_regex = rules[i].is_regex;
-            } else if (rules[i].type == ARRAY_TYPE) {
+            } else if (rules[i].type == ARRAY_TYPE || rules[i].type == ___NONE_TYPE) {
                 received_args[i].arr_len = (size_t)raw_arguments[i + 1];
                 received_args[i].arr = read_data_from_tracee(pid, raw_arguments[i], received_args[i].arr_len);
             } else {

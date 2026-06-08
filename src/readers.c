@@ -283,6 +283,10 @@ void parse_rules_from_file(char* filename) {
                     // error: missing argument comparison operator ('=')
                     return;
                 }
+                if (index >= MAX_SYSCALL_ARGS_NUM) {
+                    // error: index is too large
+                    return;
+                }
                 if (arguments_number <= index) arguments_number = index + 1;
                 free(tok.body);
             } else if (state == ST_EXPECT_NAME) {
@@ -290,6 +294,7 @@ void parse_rules_from_file(char* filename) {
                 syscall_name = tok.body;
             } else {
                 // error: wrong rule entry format
+                free(tok.body);
                 return;
             }
             break;
