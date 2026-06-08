@@ -24,18 +24,15 @@ char* lex_string(FILE* file, char brk) {
     int capacity = 20;
     int len = 0;
     char* temp;
-    char* string = (char*)malloc(len * sizeof(char));
+    char* string = (char*)malloc(capacity * sizeof(char));
     char ch = getc(file);
 
     while (ch != EOF && ch != brk) {
         if (len >= capacity) {
             capacity *= 2;
-            temp = (char*)realloc(string, capacity + 1);
-            if (temp == NULL) {
-                free(string);
-                return NULL;
-            }
-            string = temp;
+            string = (char*)realloc_or_err(string, capacity + 1, {
+                goto err;
+            });
         }
         if (IS_ESC_SEQ(ch)) { // escape sequence
             ch = getc(file);
@@ -49,14 +46,16 @@ char* lex_string(FILE* file, char brk) {
 
     if (ch == EOF) {
         // string wasn't closed
-        free(string);
-        return NULL; 
+        goto err; 
     }
 
     string[len] = '\0';
 
     return string;
 
+err:
+    free(string);
+    return NULL;
 }
 
 bool is_digit(char ch) {
@@ -119,12 +118,9 @@ Token next_token(FILE* file) {
         }
         if (len >= capacity) {
             capacity *= 2;
-            temp = (char*)realloc(buffer, capacity + 1);
-            if (temp == NULL) {
-                free(buffer);
-                return (Token){TOK_ERR, NULL};
-            }
-            buffer = temp;
+            buffer = (char*)realloc_or_err(buffer, capacity + 1, {
+                goto err;
+            });
         }
         buffer[len] = ch;
         ++len;
@@ -138,6 +134,10 @@ Token next_token(FILE* file) {
 
     if (parsing_number) return (Token){TOK_NUMBER, buffer};
     return (Token){TOK_OPERATOR, buffer};
+
+err:
+    free(buffer); 
+    return (Token){TOK_ERR, NULL};
 }
 
 /*
@@ -173,7 +173,7 @@ typedef enum {
 byte_t* parse_array(FILE* file, size_t *length) {
     size_t capacity = 64;
     size_t len = 0;
-    byte_t* array = (byte_t*)malloc(capacity * sizeof(array));
+    byte_t* array = (byte_t*)malloc(capacity * sizeof(byte_t));
     byte_t* temp = NULL;
     Token tok = next_token(file);
 
@@ -185,12 +185,9 @@ byte_t* parse_array(FILE* file, size_t *length) {
 
         if (len >= capacity) {
             capacity *= 2;
-            temp = (byte_t*)realloc(array, capacity);
-            if (temp == NULL) {
-                // error
-                return NULL;
-            }
-            array = temp;
+            array = (byte_t*)realloc_or_err(array, capacity * sizeof(byte_t), {
+                goto err;
+            });
         }
         if (strncmp(tok.body, "0x", 2) == 0) // hex representation
             strtohex_or_error(tok.body + 2, array[len], { return NULL; });
@@ -204,20 +201,21 @@ byte_t* parse_array(FILE* file, size_t *length) {
 
     if (tok.type == TOK_EOF)
         // error: array wasn't closed
-        return NULL;
+        goto err;
 
     if (len < capacity) {
-        temp = (byte_t*)realloc(array, len);
-        if (temp == NULL) {
-            // error
-            return NULL;
-        }
-        array = temp;
+        array = (byte_t*)realloc_or_err(array, len, {
+            goto err;
+        });
     }
 
 // TODO: figure out why wrong pointer to length is passed
     *length = len;
     return array;
+
+err:
+    free(array);
+    return NULL;
 }
 
 void parse_rules_from_file(char* filename) {
@@ -242,7 +240,7 @@ void parse_rules_from_file(char* filename) {
             }
             if (action == NONE_ACTION || syscall_name == NULL) {
                 // error: can't parse action or name
-                return;
+                goto err;
             }
             set_rules_for_syscall_name(syscall_name, arguments, arguments_number, action);
 
@@ -266,26 +264,26 @@ void parse_rules_from_file(char* filename) {
                     action = NOTIFY;
                 } else {
                     // error: wrong action
-                    return;
+                    goto err;
                 }
                 if (next_token(file).type != TOK_COLON) {
                     // error, missing sepqrator ':'
-                    return;
+                    goto err;
                 }
                 free(tok.body);
             } else if (state == ST_EXPECT_ARGN && strncmp(tok.body, "arg", 3) == 0) {
                 state = ST_EXPECT_VALUE;
                 strtoul_or_error(tok.body + 3, index, {
                     // error: misformatted argument number 
-                    return;
+                    goto err;
                 });
                 if (next_token(file).type != TOK_EQ_SIGN) {
                     // error: missing argument comparison operator ('=')
-                    return;
+                    goto err;
                 }
                 if (index >= MAX_SYSCALL_ARGS_NUM) {
                     // error: index is too large
-                    return;
+                    goto err;
                 }
                 if (arguments_number <= index) arguments_number = index + 1;
                 free(tok.body);
@@ -294,8 +292,7 @@ void parse_rules_from_file(char* filename) {
                 syscall_name = tok.body;
             } else {
                 // error: wrong rule entry format
-                free(tok.body);
-                return;
+                goto err;
             }
             break;
         }
@@ -303,7 +300,7 @@ void parse_rules_from_file(char* filename) {
         case TOK_STRING: {
             if (state != ST_EXPECT_VALUE) {
                 // error, not expecting value
-                return;
+                goto err;
             }
             state = ST_EXPECT_ARGN;
 
@@ -316,7 +313,7 @@ void parse_rules_from_file(char* filename) {
             // TODO: parse negative numbers as well
             if (state != ST_EXPECT_VALUE) {
                 // error, not expecting value
-                return;
+                goto err;
             }
             state = ST_EXPECT_ARGN;
 
@@ -328,7 +325,7 @@ void parse_rules_from_file(char* filename) {
             // reading array
             if (state != ST_EXPECT_VALUE) {
                 // error, not expecting value
-                return;
+                goto err;
             }
             state = ST_EXPECT_ARGN;
 
@@ -341,7 +338,10 @@ void parse_rules_from_file(char* filename) {
         tok = next_token(file);
     }
 
+err:
+    if (tok.body != NULL) free(tok.body);
     fclose(file);
+    return;
 }
 /*
 Token_t* read_rules_from_file(Token_t filename) {

@@ -22,6 +22,17 @@
 #include "tokenize.h"
 #include "sandbox.h"
 
+#define realloc_or_err(__ptr, __size, __on__error) ({ \
+    void* __local_temp = realloc(__ptr, __size); \
+    if (__local_temp == NULL) { \
+        __on__error \
+    } else { \
+        (__ptr) = __local_temp; \
+    } \
+    __local_temp; \
+})
+
+
 #define strtohex_or_error(__str, __result, __on_error) \
 do {\
     char* __endptr; \

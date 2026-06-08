@@ -422,10 +422,7 @@ Action_type print_blocked_syscall_arguments(reg_t syscall_num, pid_t pid, struct
             } else {
                 // error: wrong argument type
                 return NONE_ACTION;
-            }
-            
-            //received_args[i] = (char*)malloc((buf_len + 2 + 1) * sizeof(char));
-            //sprintf(received_args[i], syscall_args_print_formats[types[i]], buffer);
+            }            
             break;
         }
         case UINT_32_TYPE: { received_args[i].uint32 = (u_int32_t)raw_arguments[i]; break; }
