@@ -22,6 +22,7 @@ target_link_libraries(main tokenize)
 # Memory debug:
 
 add_executable(main_mem
+    src/cli_arguments.c
     src/argparse.c
     src/executors.c
     src/print_message.c

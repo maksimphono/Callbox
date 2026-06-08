@@ -41,15 +41,14 @@ void del_syscall_rules() {
 }
 
 void clean_arguments(Syscall_argument* arguments) {
-    if (arguments != NULL && arguments != &EMPTY_RULES) {
-        for (int i = 0; arguments[i].type != ___NONE_TYPE; i++) {
+    if (1) {
+        for (int i = 0; i < MAX_SYSCALL_ARGS_NUM; i++) {
             if (arguments[i].type == STRING_TYPE)
                 free(arguments[i].str);
             else if (arguments[i].type == ARRAY_TYPE)
                 free(arguments[i].arr);
            //free(arguments[i]);
         }
-        free(arguments);
     }
 }
 
@@ -58,7 +57,11 @@ void clean_syscall_rules(){
 
     while (current != NULL) {
         Syscall_argument* rule = syscalls_table[current->syscall_num].rules; // list of rules
+        if (rule == NULL) {
+            continue;
+        }
         clean_arguments(rule);
+        free(rule);
         syscalls_table[current->syscall_num].rules = NULL;
 
         next = current->next;
@@ -146,10 +149,12 @@ void set_rules_for_syscall_name(char* name, Syscall_argument arguments[], u_int3
             } else if (check_regex(arguments[i].str, "^0x[0-9a-fA-F]+-0x[0-9a-fA-F]+$") == 0) {
                 sscanf(arguments[i].str, "0x%llx-0x%llx", &rules[i].addr[0], &rules[i].addr[1]);
             } else {
+                free(arguments[i].str);
                 rules[i].addr[0] = 0;
                 rules[i].addr[1] = 0;
                 continue;
             }
+            free(arguments[i].str);
             break;
         case UINT_64_TYPE:{
             u_int64_t value = ULLONG_MAX;
@@ -158,6 +163,7 @@ void set_rules_for_syscall_name(char* name, Syscall_argument arguments[], u_int3
                 continue;
             });
             rules[i].uint64 = value;
+            free(arguments[i].str);
             break;
         }
         case UINT_32_TYPE: {
@@ -167,6 +173,7 @@ void set_rules_for_syscall_name(char* name, Syscall_argument arguments[], u_int3
                 continue;
             });
             rules[i].uint32 = value;
+            free(arguments[i].str);
             break;
         }
         case INT_32_TYPE: {
@@ -176,6 +183,7 @@ void set_rules_for_syscall_name(char* name, Syscall_argument arguments[], u_int3
                 continue;
             });
             rules[i].int32 = value;
+            free(arguments[i].str);
             break;
         }
         case INT_64_TYPE: {
@@ -185,6 +193,7 @@ void set_rules_for_syscall_name(char* name, Syscall_argument arguments[], u_int3
                 continue;
             });
             rules[i].int64 = value;
+            free(arguments[i].str);
             break;
         }
         case STRING_TYPE: {
@@ -375,9 +384,9 @@ char* read_str_from_tracee(pid_t pid, reg_t addr) {
 Action_type print_blocked_syscall_arguments(reg_t syscall_num, pid_t pid, struct user_regs_struct regs, int trace_output_fd) {
     const Syscall_arg_type* types = get_syscall_argument_types(syscall_num);
     const reg_t raw_arguments[MAX_SYSCALL_ARGS_NUM] = {regs.rdi, regs.rsi, regs.rdx, regs.r10, regs.r8, regs.r9};
-    Syscall_argument received_args[MAX_SYSCALL_ARGS_NUM] = {};
+    Syscall_argument received_args[MAX_SYSCALL_ARGS_NUM] = {EMPTY_RULES, EMPTY_RULES, EMPTY_RULES, EMPTY_RULES, EMPTY_RULES, EMPTY_RULES};
     Syscall_argument* rules = get_rules_for_syscall_id(syscall_num);
-    const char* syscall_args_print_formats[] = {NULL, "%d", "%u", "%lld", "%llu", "\"%s\"", "0x%llx", "0x%llx", "0x%llx", "0x%llx"};
+    //const char* syscall_args_print_formats[] = {NULL, "%d", "%u", "%lld", "%llu", "\"%s\"", "0x%llx", "0x%llx", "0x%llx", "0x%llx"};
     Action_type required_action = syscalls_table[syscall_num].action; // entering this function automatically means, that syscall is assumed to be blocked
 
     u_int8_t argument_num = 0;
@@ -454,12 +463,14 @@ Action_type print_blocked_syscall_arguments(reg_t syscall_num, pid_t pid, struct
         break;
     }
 
-    for (Syscall_argument* arg = &received_args[0]; arg != &received_args[MAX_SYSCALL_ARGS_NUM]; arg++) {
-        if (arg->type == STRING_TYPE)
-            free(arg->str);
-        else if (arg->type == ARRAY_TYPE)
-            free(arg->arr);
-    }
+    clean_arguments(received_args);
+
+    //for (Syscall_argument* arg = &received_args[0]; arg != &received_args[MAX_SYSCALL_ARGS_NUM]; arg++) {
+    //    if (arg->type == STRING_TYPE)
+    //        free(arg->str);
+    //    else if (arg->type == ARRAY_TYPE)
+    //        free(arg->arr);
+    //}
 
     fflush(stdout);
     return required_action;

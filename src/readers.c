@@ -197,6 +197,7 @@ byte_t* parse_array(FILE* file, size_t *length) {
         else
             strtoul_or_error(tok.body, array[len], { return NULL; });
         
+        free(tok.body);
         ++len;
         tok = next_token(file);
     }
@@ -245,6 +246,7 @@ void parse_rules_from_file(char* filename) {
             }
             set_rules_for_syscall_name(syscall_name, arguments, arguments_number, action);
 
+            free(syscall_name);
             action = NONE_ACTION;
             state = ST_EXPECT_ACTION;
             index = 0;
@@ -270,7 +272,7 @@ void parse_rules_from_file(char* filename) {
                     // error, missing sepqrator ':'
                     return;
                 }
-                break;
+                free(tok.body);
             } else if (state == ST_EXPECT_ARGN && strncmp(tok.body, "arg", 3) == 0) {
                 state = ST_EXPECT_VALUE;
                 strtoul_or_error(tok.body + 3, index, {
@@ -281,7 +283,8 @@ void parse_rules_from_file(char* filename) {
                     // error: missing argument comparison operator ('=')
                     return;
                 }
-                if (arguments_number < index) arguments_number = index;
+                if (arguments_number <= index) arguments_number = index + 1;
+                free(tok.body);
             } else if (state == ST_EXPECT_NAME) {
                 state = ST_EXPECT_ARGN;
                 syscall_name = tok.body;
