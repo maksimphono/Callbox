@@ -24,6 +24,6 @@ Trace_result run_tracer(pid_t pid, pid_t group_id, int);
 
 int trace_program(Token_t* tokens, u_int32_t tokens_length, CommandExecutionResult_t* execution_result, int, int);
 
-CommandExecutionResult_t* execute_commands_workflow(Token_t*, u_int32_t, Arguments* cli_arguments);
+byte_t execute_commands_workflow(Token_t*, u_int32_t, Arguments* cli_arguments);
 
 #endif

@@ -166,10 +166,8 @@ int trace_program(Token_t* tokens, u_int32_t tokens_length, CommandExecutionResu
 
 
 // Executes full pipeline of commands (series of commands, connected by pipes '|')
-CommandExecutionResult_t* execute_commands_workflow(Token_t* tokens, u_int32_t tokens_length, Arguments* cli_arguments) {
+byte_t execute_commands_workflow(Token_t* tokens, u_int32_t tokens_length, Arguments* cli_arguments) {
     // it's a pipeline of commands
-    CommandExecutionResult_t* result = NULL;
-
     int prev_pipe_read_fd = STDIN_FILENO; // read from stdin by default
     int trace_output_fd = STDOUT_FILENO;
 
@@ -177,7 +175,11 @@ CommandExecutionResult_t* execute_commands_workflow(Token_t* tokens, u_int32_t t
         prev_pipe_read_fd = open(cli_arguments->input_file, O_RDONLY);
 
     if (cli_arguments->rules_file != NULL)
-        parse_rules_from_file(cli_arguments->rules_file);
+        if (parse_rules_from_file(cli_arguments->rules_file) != 0) {
+            if (trace_output_fd != STDOUT_FILENO) 
+                close(trace_output_fd);
+            return -1;
+        }
     else
         print_empty_rules();
 
@@ -186,7 +188,7 @@ CommandExecutionResult_t* execute_commands_workflow(Token_t* tokens, u_int32_t t
     }
 
     int trace_result = trace_program(
-        tokens, tokens_length, result, prev_pipe_read_fd, trace_output_fd
+        tokens, tokens_length, NULL, prev_pipe_read_fd, trace_output_fd
     );
 
     if (trace_output_fd != STDOUT_FILENO) 
@@ -200,5 +202,5 @@ CommandExecutionResult_t* execute_commands_workflow(Token_t* tokens, u_int32_t t
     //    waitpid(group_id, &status, 0); 
     //}
 
-    return result;
+    return 0;
 }

@@ -28,7 +28,7 @@ typedef struct Token {
 
 Token next_token(FILE* file);
 
-void parse_rules_from_file(char* filename);
+byte_t parse_rules_from_file(char* filename);
 
 Token_t* read_rules_from_file(Token_t filename);
 

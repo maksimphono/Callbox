@@ -218,7 +218,7 @@ err:
     return NULL;
 }
 
-void parse_rules_from_file(char* filename) {
+byte_t parse_rules_from_file(char* filename) {
     FILE* file = fopen(filename, "r");
     Token tok = next_token(file);
     u_int32_t arguments_number = 0;
@@ -334,16 +334,18 @@ void parse_rules_from_file(char* filename) {
             arguments[index].type = ARRAY_TYPE;
             byte_t* arr = parse_array(file, &arguments[index].arr_len);
             arguments[index].arr = arr;
+            if (arr == NULL) goto err;
             break;
         }
         }
         tok = next_token(file);
     }
 
+    return 0;
 err:
     if (tok.body != NULL) free(tok.body);
     fclose(file);
-    return;
+    return -1;
 }
 /*
 Token_t* read_rules_from_file(Token_t filename) {
