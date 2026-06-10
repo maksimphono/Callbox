@@ -96,18 +96,20 @@ void record_syscall_with_rules(u_int32_t syscall_num) {
 
 // Will set rules for the syscall by provided name
 // arguments must be in exact order (argument 0, argument 1, argument 2...)
-void set_rules_for_syscall_name(char* name, Syscall_argument arguments[], u_int32_t arguments_length, Action_type action) {
+ExitStatus_t set_rules_for_syscall_name(char* name, Syscall_argument arguments[], u_int32_t arguments_length, Action_type action) {
     Syscall_argument* rules = NULL;
     u_int32_t i = 0;
 
     u_int32_t syscall_num = get_Syscall_hashmap(syscalls_map, name);
     if (syscall_num == HM_NOT_FOUND || 
         IS_EMPTY_SYSCALL(syscalls_table[syscall_num])
-    ) return;
+    ) 
+        // error: unknown syscall (can be ignored)
+        return EXIT_PARSER_ERR;
 
     rules = get_rules_for_syscall_id(syscall_num);
 
-    if (rules != NULL) return; // rules for that syscall were already set
+    if (rules != NULL) return EXIT_SUCCESS_; // rules for that syscall were already set
 
     record_syscall_with_rules(syscall_num);
 
@@ -116,7 +118,7 @@ void set_rules_for_syscall_name(char* name, Syscall_argument arguments[], u_int3
         syscalls_table[syscall_num].rules = &EMPTY_RULES;
         syscalls_table[syscall_num].action = action;
         printf("Setting empty rules for syscall %s\n", name);
-        return;
+        return EXIT_SUCCESS_;
     }
 
     // create new rules
@@ -206,7 +208,7 @@ void set_rules_for_syscall_name(char* name, Syscall_argument arguments[], u_int3
         case STRING_TYPE: {
             if (arguments[i].type != STRING_TYPE) {
                 // error: string expected
-                return;
+                return EXIT_PARSER_ERR;
             }
             rules[i] = arguments[i];
             break;
@@ -215,7 +217,7 @@ void set_rules_for_syscall_name(char* name, Syscall_argument arguments[], u_int3
             // TODO: parse provided byte array
             if (arguments[i].type != ARRAY_TYPE && arguments[i].type != STRING_TYPE) {
                 // error: array expected
-                return;
+                return EXIT_PARSER_ERR;
             }
 
             rules[i] = arguments[i];

@@ -218,7 +218,8 @@ err:
     return NULL;
 }
 
-byte_t parse_rules_from_file(char* filename) {
+ExitStatus_t parse_rules_from_file(char* filename) {
+    ExitStatus_t st = EXIT_UNKNOWN_ERR;
     FILE* file = fopen(filename, "r");
     Token tok = next_token(file);
     u_int32_t arguments_number = 0;
@@ -244,7 +245,9 @@ byte_t parse_rules_from_file(char* filename) {
                 // error: can't parse action or name
                 goto err;
             }
-            set_rules_for_syscall_name(syscall_name, arguments, arguments_number, action);
+            if (st = set_rules_for_syscall_name(syscall_name, arguments, arguments_number, action) != EXIT_SUCCESS_) {
+                goto err;
+            }
 
             free(syscall_name);
             action = NONE_ACTION;
@@ -341,11 +344,11 @@ byte_t parse_rules_from_file(char* filename) {
         tok = next_token(file);
     }
 
-    return 0;
+    return EXIT_SUCCESS_;
 err:
     if (tok.body != NULL) free(tok.body);
     fclose(file);
-    return -1;
+    return st;
 }
 /*
 Token_t* read_rules_from_file(Token_t filename) {

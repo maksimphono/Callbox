@@ -166,8 +166,9 @@ int trace_program(Token_t* tokens, u_int32_t tokens_length, CommandExecutionResu
 
 
 // Executes full pipeline of commands (series of commands, connected by pipes '|')
-byte_t execute_commands_workflow(Token_t* tokens, u_int32_t tokens_length, Arguments* cli_arguments) {
+ExitStatus_t execute_commands_workflow(Token_t* tokens, u_int32_t tokens_length, Arguments* cli_arguments) {
     // it's a pipeline of commands
+    ExitStatus_t exit_status = EXIT_UNKNOWN_ERR;
     int prev_pipe_read_fd = STDIN_FILENO; // read from stdin by default
     int trace_output_fd = STDOUT_FILENO;
 
@@ -175,10 +176,11 @@ byte_t execute_commands_workflow(Token_t* tokens, u_int32_t tokens_length, Argum
         prev_pipe_read_fd = open(cli_arguments->input_file, O_RDONLY);
 
     if (cli_arguments->rules_file != NULL)
-        if (parse_rules_from_file(cli_arguments->rules_file) != 0) {
+        if (exit_status = parse_rules_from_file(cli_arguments->rules_file) != 0) {
             if (trace_output_fd != STDOUT_FILENO) 
                 close(trace_output_fd);
-            return -1;
+            printf("Error with setting rules\n");
+            return exit_status;
         }
     else
         print_empty_rules();
@@ -202,5 +204,5 @@ byte_t execute_commands_workflow(Token_t* tokens, u_int32_t tokens_length, Argum
     //    waitpid(group_id, &status, 0); 
     //}
 
-    return 0;
+    return EXIT_SUCCESS_;
 }

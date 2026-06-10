@@ -32,6 +32,7 @@ typedef unsigned char byte_t;
 // Hashmap:
 #define HM_NOT_FOUND (u_int32_t)-1
 
+typedef enum {EXIT_SUCCESS_, EXIT_UNKNOWN_ERR, EXIT_PARSER_ERR, EXIT_MEM_ERR, EXIT_TRACE_ERR} ExitStatus_t;
 
 
 #endif
