@@ -1,3 +1,7 @@
+#define _GNU_SOURCE
+
+#include <fcntl.h>
+
 #include "../include/sandbox.h"
 #include "../include/hashmap.h"
 #include "../include/syscalls_table.h"
@@ -19,6 +23,11 @@ const char* get_name_for_syscall_id(u_int32_t id){
 const Syscall_arg_type* get_syscall_argument_types(reg_t syscall_num) {
     if (syscall_num > syscalls_table_len) return NULL;
     return &syscalls_table[syscall_num].arg_types[0];
+}
+
+const byte_t get_syscall_flags(reg_t syscall_num) {
+    if (syscall_num > syscalls_table_len) return 0x0;
+    return syscalls_table[syscall_num].flags;
 }
 
 void init_syscall_rules() {
@@ -390,6 +399,34 @@ err:
     return NULL;
 }
 
+u_int8_t process_syscall_open(pid_t pid, const reg_t raw_arguments[MAX_SYSCALL_ARGS_NUM], Syscall_argument received_args[MAX_SYSCALL_ARGS_NUM]) {
+    u_int8_t argument_num = 2;
+    received_args[0].type = STRING_TYPE;
+    received_args[0].str = read_str_from_tracee(pid, raw_arguments[0]);
+
+    received_args[1].type = INT_32_TYPE;
+    const int flags = received_args[1].int32 = (int)raw_arguments[1];
+
+    if (flags & O_CREAT || (flags & O_TMPFILE) == O_TMPFILE) {
+        // scanning mode argument
+        argument_num = 3;
+        received_args[2].type = UINT_32_TYPE;
+        received_args[2].uint32 = (u_int32_t)raw_arguments[2];
+    }
+
+    return argument_num;
+}
+
+u_int8_t process_special_syscall(reg_t syscall_num, pid_t pid, const reg_t raw_arguments[MAX_SYSCALL_ARGS_NUM], Syscall_argument received_args[MAX_SYSCALL_ARGS_NUM]){
+    // dispatcher
+    switch (syscall_num) {
+    case 2:
+        return process_syscall_open(pid, raw_arguments, received_args);
+
+    }
+}
+
+
 // TODO: process empty string in the rules and in outputs
 Action_type print_blocked_syscall_arguments(reg_t syscall_num, pid_t pid, struct user_regs_struct regs, int trace_output_fd) {
     const Syscall_arg_type* types = get_syscall_argument_types(syscall_num);
@@ -398,9 +435,15 @@ Action_type print_blocked_syscall_arguments(reg_t syscall_num, pid_t pid, struct
     Syscall_argument* rules = get_rules_for_syscall_id(syscall_num);
     //const char* syscall_args_print_formats[] = {NULL, "%d", "%u", "%lld", "%llu", "\"%s\"", "0x%llx", "0x%llx", "0x%llx", "0x%llx"};
     Action_type required_action = syscalls_table[syscall_num].action; // entering this function automatically means, that syscall is assumed to be blocked
+    flags8_t flags = get_syscall_flags(syscall_num);
 
     u_int8_t argument_num = 0;
     u_int8_t i = 0;
+
+    if ((flags & (flags8_t)128) == (flags8_t)128) {
+        // special syscall
+        argument_num = process_special_syscall(syscall_num, pid, raw_arguments, received_args);
+    } else
 
     // collect arguments in form of array of Syscall_argument
     for (i = 0; types[i] != ___NONE_TYPE && i < MAX_SYSCALL_ARGS_NUM; i++) {
@@ -447,17 +490,7 @@ Action_type print_blocked_syscall_arguments(reg_t syscall_num, pid_t pid, struct
             break;
         }
     }
-/*
-    // check if syscall arguments actually are forbidden
-    for (i = 0; i < argument_num && get_rules_for_syscall_id(syscall_num)[i].type != ___NONE_TYPE; i++) {
-        Syscall_argument* arg = &get_rules_for_syscall_id(syscall_num)[i];
-        if (not(cmp_syscall_argument(arg, &received_args[i]))) {
-            // arguments don't match -> do nothing
-            required_action = NONE_ACTION;
-            break;
-        }
-    }
-*/
+
     switch (required_action) {
     case BLOCK:
         print_catched_syscall(trace_output_fd, "Blocked", get_name_for_syscall_id(syscall_num), argument_num, received_args);

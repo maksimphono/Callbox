@@ -13,6 +13,8 @@
 #include "defs.h"
 #include "utils.h"
 
+typedef unsigned char flags8_t;
+
 typedef enum {SUCCESS, UNKNOWN_ERROR, BLOCKED_SYSCALL} Trace_result;
 typedef enum {
     ___NONE_TYPE = 0,
@@ -85,7 +87,7 @@ typedef struct Syscall_abstract {
 
 extern const Syscall_argument EMPTY_RULES;
 
-#define IS_SPECIAL(syscall) (syscall.flags & (unsigned char)0x128)
+#define IS_SPECIAL(flags) (flags & (unsigned char)0x128)
 #define RULE_IS_NONE(rule) (rule.type == ___NONE_TYPE)
 #define EMPTY_SYSCALL {0, {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}, {___NONE_TYPE,___NONE_TYPE,___NONE_TYPE,___NONE_TYPE,___NONE_TYPE,___NONE_TYPE}, 0, NULL,NONE_ACTION}
 #define IS_EMPTY_SYSCALL(syscall) (syscall.name[0] == 0)
@@ -114,8 +116,15 @@ void clean_syscall_rules();
 
 void reset_syscall_rules();
 
+ 
+byte_t* read_data_from_tracee(pid_t pid, reg_t addr, size_t length);
+
+char* read_str_from_tracee(pid_t pid, reg_t addr);
+
 // Will set rules for the syscall by provided name
 ExitStatus_t set_rules_for_syscall_name(char* name, Syscall_argument arguments[], u_int32_t arguments_length, Action_type);
+
+u_int8_t process_special_syscall(reg_t syscall_num, pid_t pid, const reg_t arguments[MAX_SYSCALL_ARGS_NUM], Syscall_argument received_args[MAX_SYSCALL_ARGS_NUM]);
 
 Action_type print_blocked_syscall_arguments(reg_t syscall_num, pid_t pid, struct user_regs_struct regs, int);
 
