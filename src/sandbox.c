@@ -66,12 +66,14 @@ void clean_syscall_rules(){
 
     while (current != NULL) {
         Syscall_argument* rule = syscalls_table[current->syscall_num].rules; // list of rules
-        if (rule == NULL) {
-            continue;
+        if (rule == NULL || rule == &EMPTY_RULES) {
+            // noting to do
+            syscalls_table[current->syscall_num].rules = NULL;
+        } else {
+            clean_arguments(rule);
+            free(rule);
+            syscalls_table[current->syscall_num].rules = NULL;
         }
-        clean_arguments(rule);
-        free(rule);
-        syscalls_table[current->syscall_num].rules = NULL;
 
         next = current->next;
         free(current);
@@ -417,12 +419,34 @@ u_int8_t process_syscall_open(pid_t pid, const reg_t raw_arguments[MAX_SYSCALL_A
     return argument_num;
 }
 
+u_int8_t process_syscall_openat(pid_t pid, const reg_t raw_arguments[MAX_SYSCALL_ARGS_NUM], Syscall_argument received_args[MAX_SYSCALL_ARGS_NUM]) {
+    u_int8_t argument_num = 3;
+    received_args[0].type = INT_32_TYPE;
+    received_args[0].int32 = (int32_t)raw_arguments[0];
+
+    received_args[1].type = STRING_TYPE;
+    received_args[1].str = read_str_from_tracee(pid, raw_arguments[1]);
+
+    received_args[2].type = INT_32_TYPE;
+    const int oflag = received_args[2].int32 = (int)raw_arguments[2];
+
+    if (oflag & O_CREAT || (oflag & O_TMPFILE) == O_TMPFILE) {
+        // scanning mode argument
+        argument_num = 4;
+        received_args[3].type = UINT_32_TYPE;
+        received_args[3].uint32 = (u_int32_t)raw_arguments[3];
+    }
+
+    return argument_num;
+}
+
 u_int8_t process_special_syscall(reg_t syscall_num, pid_t pid, const reg_t raw_arguments[MAX_SYSCALL_ARGS_NUM], Syscall_argument received_args[MAX_SYSCALL_ARGS_NUM]){
     // dispatcher
     switch (syscall_num) {
     case SYSN_OPEN:
         return process_syscall_open(pid, raw_arguments, received_args);
-
+    //case SYSN_OPENAT:
+    //    return process_syscall_openat(pid, raw_arguments, received_args);
     }
 }
 
@@ -470,11 +494,11 @@ Action_type print_blocked_syscall_arguments(reg_t syscall_num, pid_t pid, struct
                 }            
                 break;
             }
-            case UINT_32_TYPE: { received_args[i].uint32 = (u_int32_t)raw_arguments[i]; break; }
-            case UINT_64_TYPE: { received_args[i].uint64 = (u_int64_t)raw_arguments[i]; break; }
-            case INT_32_TYPE: { received_args[i].int32 = (int32_t)raw_arguments[i]; break; }
-            case INT_64_TYPE: { received_args[i].int64 = (int64_t)raw_arguments[i]; break; }
-            case ADDRESS_TYPE: { received_args[i].addr[0] = (uintptr_t)raw_arguments[i]; break; }
+            case UINT_32_TYPE: { received_args[i].uint32  = (u_int32_t)raw_arguments[i];  break; }
+            case UINT_64_TYPE: { received_args[i].uint64  = (u_int64_t)raw_arguments[i];  break; }
+            case INT_32_TYPE:  { received_args[i].int32   = (int32_t)raw_arguments[i];    break; }
+            case INT_64_TYPE:  { received_args[i].int64   = (int64_t)raw_arguments[i];    break; }
+            case ADDRESS_TYPE: { received_args[i].addr[0] = (uintptr_t)raw_arguments[i];  break; }
             default: { received_args[i].other = (void*)raw_arguments[i]; break; }
             }
         }

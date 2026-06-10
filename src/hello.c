@@ -5,7 +5,7 @@
 #include <sys/syscall.h>
 
 int main() {
-  int fd = syscall(SYS_open, "raw_file.txt", O_WRONLY);
+  int fd = open("raw_file.txt", O_WRONLY | O_CREAT, 0764);
   close(fd);
   //char c = getc(stdin);
   //write(1, "qwe", 3);
