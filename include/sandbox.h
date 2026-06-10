@@ -36,23 +36,6 @@ typedef enum {
     NOTIFY // just notify about syscall being made with specific arguments, continue execution
 } Action_type;
 
-// Structure, that will hold rules for each syscall, each element is a syscall with list of corresponding forbidden agruments values
-
-enum {
-    SYS_READ        = 0,
-    SYS_WRITE       = 1,
-    SYS_OPEN        = 2,
-    SYS_MMAP        = 9,
-    SYS_PIPE        = 22,
-    SYS_SCHED_YIELD = 24,
-    SYS_DUP         = 32,
-    SYS_CLONE       = 56,
-    SYS_FORK        = 57,
-    SYS_EXECVE      = 59,
-    SYS_MKDIR       = 83,
-    SYS_CHMOD       = 90
-};
-
 // Argument of a syscall, that will be stored in syscall rules list and define undesired argument type and it's value
 typedef struct Syscall_argument {
     Syscall_arg_type type;
@@ -87,7 +70,7 @@ typedef struct Syscall_abstract {
 
 extern const Syscall_argument EMPTY_RULES;
 
-#define IS_SPECIAL(flags) (flags & (unsigned char)0x128)
+#define IS_SPECIAL(__flags) ((__flags & (flags8_t)128) == (flags8_t)128)
 #define RULE_IS_NONE(rule) (rule.type == ___NONE_TYPE)
 #define EMPTY_SYSCALL {0, {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}, {___NONE_TYPE,___NONE_TYPE,___NONE_TYPE,___NONE_TYPE,___NONE_TYPE,___NONE_TYPE}, 0, NULL,NONE_ACTION}
 #define IS_EMPTY_SYSCALL(syscall) (syscall.name[0] == 0)
