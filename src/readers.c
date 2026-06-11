@@ -322,7 +322,7 @@ ExitStatus_t parse_rules_from_file(char* filename) {
             }
             state = ST_EXPECT_ARGN;
 
-            arguments[index].type = UINT_64_TYPE; // just uint64 by default, will be converted to the actual type later
+            arguments[index].type = ULLONG_TYPE; // just uint64 by default, will be converted to the actual type later
             arguments[index].str = tok.body;
             break;
         }

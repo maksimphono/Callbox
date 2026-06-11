@@ -16,14 +16,16 @@
 typedef enum {SUCCESS, UNKNOWN_ERROR, BLOCKED_SYSCALL} Trace_result;
 typedef enum {
     ___NONE_TYPE = 0,
-    INT_32_TYPE  = 1, 
-    UINT_32_TYPE = 2, 
-    INT_64_TYPE  = 3, 
-    UINT_64_TYPE = 4, 
-    STRING_TYPE  = 5, 
-    ADDRESS_TYPE = 6,
-    ARRAY_TYPE   = 7,
-    VARIAD_TYPE  = 8,
+    INT_TYPE  = 1, 
+    UINT_TYPE = 2, 
+    LONG_TYPE  = 3, 
+    ULONG_TYPE = 4,
+    LLONG_TYPE,
+    ULLONG_TYPE,
+    STRING_TYPE, 
+    ADDRESS_TYPE,
+    ARRAY_TYPE,
+    VARIAD_TYPE,
     OTHER_TYPE
 } Syscall_arg_type;
 
@@ -55,12 +57,12 @@ enum {
 typedef struct Syscall_argument {
     Syscall_arg_type type;
     union {
-        u_int64_t uint64;
-        int64_t int64;
-        u_int32_t uint32;
-        int32_t int32;
-        u_int16_t uint16;
-        int16_t int16;
+        unsigned long long ullong;
+        long long llong;
+        unsigned long ulong;
+        long long_;
+        unsigned int uint;
+        int int_;
         struct {
             bool is_regex;
             char* str;

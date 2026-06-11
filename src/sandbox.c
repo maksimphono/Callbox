@@ -94,6 +94,7 @@ void record_syscall_with_rules(u_int32_t syscall_num) {
 // TODO: create custom handlers for special syscalls, that requires specific tracing strategy
 //       for example with variadic or strange array arguments
 
+
 // Will set rules for the syscall by provided name
 // arguments must be in exact order (argument 0, argument 1, argument 2...)
 ExitStatus_t set_rules_for_syscall_name(char* name, Syscall_argument arguments[], u_int32_t arguments_length, Action_type action) {
@@ -142,7 +143,7 @@ ExitStatus_t set_rules_for_syscall_name(char* name, Syscall_argument arguments[]
         case ___NONE_TYPE:
             // if argument wasn't specified -> just skip
             switch (arguments[i].type) {
-            case UINT_64_TYPE:
+            case ULLONG_TYPE:
             case STRING_TYPE: {
                 free(arguments[i].str);
                 break;
@@ -153,7 +154,7 @@ ExitStatus_t set_rules_for_syscall_name(char* name, Syscall_argument arguments[]
             continue;
         case ADDRESS_TYPE:
             // assuming address starts with "0x" (16-base int), starting scanning number from second position
-            if (arguments[i].type == UINT_64_TYPE) {
+            if (arguments[i].type == ULLONG_TYPE) {
                 rules[i].addr[0] = rules[i].addr[1] = (uintptr_t)strtoull(arguments[i].str, &endptr, 16);
             } else if (check_regex(arguments[i].str, "^0x[0-9a-fA-F]+-0x[0-9a-fA-F]+$") == 0) {
                 sscanf(arguments[i].str, "0x%llx-0x%llx", &rules[i].addr[0], &rules[i].addr[1]);
@@ -165,43 +166,65 @@ ExitStatus_t set_rules_for_syscall_name(char* name, Syscall_argument arguments[]
             }
             free(arguments[i].str);
             break;
-        case UINT_64_TYPE:{
-            u_int64_t value = ULLONG_MAX;
+
+// TODO: implement native C types processing
+            case ULLONG_TYPE:{
+            unsigned long long value = ULLONG_MAX;
             strtoull_or_error(arguments[i].str, value, {
                 // probably wrong type was specified
                 continue;
             });
-            rules[i].uint64 = value;
+            rules[i].ullong = value;
             free(arguments[i].str);
             break;
         }
-        case UINT_32_TYPE: {
-            u_int32_t value = ULONG_MAX;
-            strtoul_or_error(arguments[i].str, value, {
-                // probably wrong type was specified
-                continue;
-            });
-            rules[i].uint32 = value;
-            free(arguments[i].str);
-            break;
-        }
-        case INT_32_TYPE: {
-            int32_t value = LONG_MAX;
-            strtol_or_error(arguments[i].str, value, {
-                // probably wrong type was specified
-                continue;
-            });
-            rules[i].int32 = value;
-            free(arguments[i].str);
-            break;
-        }
-        case INT_64_TYPE: {
-            int64_t value = LLONG_MAX;
+        case LLONG_TYPE: {
+            long long value = LLONG_MAX;
             strtoll_or_error(arguments[i].str, value, {
                 // probably wrong type was specified
                 continue;
             });
-            rules[i].int64 = value;
+            rules[i].llong = value;
+            free(arguments[i].str);
+            break;
+        }
+        case ULONG_TYPE:{
+            unsigned long value = ULONG_MAX;
+            strtol_or_error(arguments[i].str, value, {
+                // probably wrong type was specified
+                continue;
+            });
+            rules[i].ulong = value;
+            free(arguments[i].str);
+            break;
+        }
+        case LONG_TYPE:{
+            long value = LONG_MAX;
+            strtol_or_error(arguments[i].str, value, {
+                // probably wrong type was specified
+                continue;
+            });
+            rules[i].long_ = value;
+            free(arguments[i].str);
+            break;
+        }
+        case UINT_TYPE: {
+            unsigned int value = UINT32_MAX;
+            strtoul_or_error(arguments[i].str, value, {
+                // probably wrong type was specified
+                continue;
+            });
+            rules[i].uint = value;
+            free(arguments[i].str);
+            break;
+        }
+        case INT_TYPE: {
+            int value = INT32_MAX;
+            strtol_or_error(arguments[i].str, value, {
+                // probably wrong type was specified
+                continue;
+            });
+            rules[i].int_ = value;
             free(arguments[i].str);
             break;
         }
@@ -239,20 +262,20 @@ ExitStatus_t set_rules_for_syscall_name(char* name, Syscall_argument arguments[]
         case ADDRESS_TYPE:
             printf("type: ADDRESS_TYPE, val = %llx-%llx\n", r[i].addr[0], r[i].addr[1]);
             break;
-        case UINT_64_TYPE:{
-            printf("type: UINT_64_TYPE, val = %llu\n", r[i].uint64);
+        case ULLONG_TYPE:{
+            printf("type: ULLONG_TYPE, val = %llu\n", r[i].uint64);
             break;
         }
-        case INT_64_TYPE: {
-            printf("type: INT_64_TYPE, val = %lld\n", r[i].int64);
+        case LLONG_TYPE: {
+            printf("type: LLONG_TYPE, val = %lld\n", r[i].int64);
             break;
         }
-        case UINT_32_TYPE: {
-            printf("type: UINT_32_TYPE, val = %u\n", r[i].uint32);
+        case UINT_TYPE: {
+            printf("type: UINT_TYPE, val = %u\n", r[i].uint32);
             break;
         }
-        case INT_32_TYPE: {
-            printf("type: INT_32_TYPE, val = %d\n", r[i].int32);
+        case INT_TYPE: {
+            printf("type: INT_TYPE, val = %d\n", r[i].int32);
             break;
         }
         case STRING_TYPE: {
@@ -277,19 +300,19 @@ bool cmp_syscall_argument(Syscall_argument* argument, Syscall_argument* received
     switch (argument->type) {
     case ADDRESS_TYPE:
         return (argument->addr[0] <= received_arg->addr[0] && argument->addr[1] >= received_arg->addr[0]);
-    case UINT_64_TYPE:{
+    case ULLONG_TYPE:{
         printf("Comparing: %llu == %llu: %d", argument->uint64, received_arg->uint64, argument->uint64 == received_arg->uint64);
         return argument->uint64 == received_arg->uint64;
     }
-    case UINT_32_TYPE: {
+    case UINT_TYPE: {
         printf("Comparing: %u == %u: %d", argument->uint32, received_arg->uint32, argument->uint32 == received_arg->uint32);
         return argument->uint32 == received_arg->uint32;
     }
-    case INT_32_TYPE: {
+    case INT_TYPE: {
         printf("Comparing: %d == %d: %d", argument->int32, received_arg->int32, argument->int32 == received_arg->int32);
         return argument->int32 == received_arg->int32;
     }
-    case INT_64_TYPE: {
+    case LLONG_TYPE: {
         printf("Comparing: %lld == %lld: %d", argument->int64, received_arg->int64, argument->int64 == received_arg->int64);
         return argument->int64 == received_arg->int64;
     }
@@ -428,10 +451,10 @@ Action_type print_blocked_syscall_arguments(reg_t syscall_num, pid_t pid, struct
             }            
             break;
         }
-        case UINT_32_TYPE: { received_args[i].uint32 = (u_int32_t)raw_arguments[i]; break; }
-        case UINT_64_TYPE: { received_args[i].uint64 = (u_int64_t)raw_arguments[i]; break; }
-        case INT_32_TYPE: { received_args[i].int32 = (int32_t)raw_arguments[i]; break; }
-        case INT_64_TYPE: { received_args[i].int64 = (int64_t)raw_arguments[i]; break; }
+        case UINT_TYPE: { received_args[i].uint32 = (u_int32_t)raw_arguments[i]; break; }
+        case ULLONG_TYPE: { received_args[i].uint64 = (u_int64_t)raw_arguments[i]; break; }
+        case INT_TYPE: { received_args[i].int32 = (int32_t)raw_arguments[i]; break; }
+        case LLONG_TYPE: { received_args[i].int64 = (int64_t)raw_arguments[i]; break; }
         case ADDRESS_TYPE: { received_args[i].addr[0] = (uintptr_t)raw_arguments[i]; break; }
         default: { received_args[i].other = (void*)raw_arguments[i]; break; }
         }
