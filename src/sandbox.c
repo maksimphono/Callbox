@@ -168,7 +168,7 @@ ExitStatus_t set_rules_for_syscall_name(char* name, Syscall_argument arguments[]
             break;
 
 // TODO: implement native C types processing
-            case ULLONG_TYPE:{
+        case ULLONG_TYPE:{
             unsigned long long value = ULLONG_MAX;
             strtoull_or_error(arguments[i].str, value, {
                 // probably wrong type was specified
@@ -190,7 +190,7 @@ ExitStatus_t set_rules_for_syscall_name(char* name, Syscall_argument arguments[]
         }
         case ULONG_TYPE:{
             unsigned long value = ULONG_MAX;
-            strtol_or_error(arguments[i].str, value, {
+            strtoul_or_error(arguments[i].str, value, {
                 // probably wrong type was specified
                 continue;
             });
@@ -263,19 +263,27 @@ ExitStatus_t set_rules_for_syscall_name(char* name, Syscall_argument arguments[]
             printf("type: ADDRESS_TYPE, val = %llx-%llx\n", r[i].addr[0], r[i].addr[1]);
             break;
         case ULLONG_TYPE:{
-            printf("type: ULLONG_TYPE, val = %llu\n", r[i].uint64);
+            printf("type: ULLONG_TYPE, val = %llu\n", r[i].ullong);
             break;
         }
         case LLONG_TYPE: {
-            printf("type: LLONG_TYPE, val = %lld\n", r[i].int64);
+            printf("type: LLONG_TYPE, val = %lld\n", r[i].llong);
+            break;
+        }
+        case ULONG_TYPE:{
+            printf("type: ULONG_TYPE, val = %llu\n", r[i].ulong);
+            break;
+        }
+        case LONG_TYPE: {
+            printf("type: LONG_TYPE, val = %lld\n", r[i].long_);
             break;
         }
         case UINT_TYPE: {
-            printf("type: UINT_TYPE, val = %u\n", r[i].uint32);
+            printf("type: UINT_TYPE, val = %u\n", r[i].uint);
             break;
         }
         case INT_TYPE: {
-            printf("type: INT_TYPE, val = %d\n", r[i].int32);
+            printf("type: INT_TYPE, val = %d\n", r[i].int_);
             break;
         }
         case STRING_TYPE: {
@@ -300,21 +308,29 @@ bool cmp_syscall_argument(Syscall_argument* argument, Syscall_argument* received
     switch (argument->type) {
     case ADDRESS_TYPE:
         return (argument->addr[0] <= received_arg->addr[0] && argument->addr[1] >= received_arg->addr[0]);
-    case ULLONG_TYPE:{
-        printf("Comparing: %llu == %llu: %d", argument->uint64, received_arg->uint64, argument->uint64 == received_arg->uint64);
-        return argument->uint64 == received_arg->uint64;
-    }
     case UINT_TYPE: {
-        printf("Comparing: %u == %u: %d", argument->uint32, received_arg->uint32, argument->uint32 == received_arg->uint32);
-        return argument->uint32 == received_arg->uint32;
+        printf("Comparing: %u == %u: %d", argument->uint, received_arg->uint, argument->uint == received_arg->uint);
+        return argument->uint == received_arg->uint;
     }
     case INT_TYPE: {
-        printf("Comparing: %d == %d: %d", argument->int32, received_arg->int32, argument->int32 == received_arg->int32);
-        return argument->int32 == received_arg->int32;
+        printf("Comparing: %d == %d: %d", argument->int_, received_arg->int_, argument->int_ == received_arg->int_);
+        return argument->int_ == received_arg->int_;
+    }
+    case ULONG_TYPE:{
+        printf("Comparing: %llu == %llu: %d", argument->ulong, received_arg->ulong, argument->ulong == received_arg->ulong);
+        return argument->ulong == received_arg->ulong;
+    }
+    case LONG_TYPE: {
+        printf("Comparing: %lld == %lld: %d", argument->long_, received_arg->long_, argument->long_ == received_arg->long_);
+        return argument->long_ == received_arg->long_;
+    }
+    case ULLONG_TYPE:{
+        printf("Comparing: %llu == %llu: %d", argument->ullong, received_arg->ullong, argument->ullong == received_arg->ullong);
+        return argument->ullong == received_arg->ullong;
     }
     case LLONG_TYPE: {
-        printf("Comparing: %lld == %lld: %d", argument->int64, received_arg->int64, argument->int64 == received_arg->int64);
-        return argument->int64 == received_arg->int64;
+        printf("Comparing: %lld == %lld: %d", argument->llong, received_arg->llong, argument->llong == received_arg->llong);
+        return argument->llong == received_arg->llong;
     }
     case STRING_TYPE: {
         printf("Comparing: %s == %s: %d", argument->str, received_arg->str, strcmp(argument->str, received_arg->str));
@@ -451,11 +467,13 @@ Action_type print_blocked_syscall_arguments(reg_t syscall_num, pid_t pid, struct
             }            
             break;
         }
-        case UINT_TYPE: { received_args[i].uint32 = (u_int32_t)raw_arguments[i]; break; }
-        case ULLONG_TYPE: { received_args[i].uint64 = (u_int64_t)raw_arguments[i]; break; }
-        case INT_TYPE: { received_args[i].int32 = (int32_t)raw_arguments[i]; break; }
-        case LLONG_TYPE: { received_args[i].int64 = (int64_t)raw_arguments[i]; break; }
-        case ADDRESS_TYPE: { received_args[i].addr[0] = (uintptr_t)raw_arguments[i]; break; }
+        case ULLONG_TYPE: { received_args[i].ullong = (unsigned long long)raw_arguments[i]; break; }
+        case LLONG_TYPE:  { received_args[i].llong  = (signed long long)raw_arguments[i];   break; }
+        case ULONG_TYPE:  { received_args[i].ulong  = (unsigned long)raw_arguments[i];      break; }
+        case LONG_TYPE:   { received_args[i].long_  = (signed long)raw_arguments[i];        break; }
+        case UINT_TYPE:   { received_args[i].uint   = (unsigned int)raw_arguments[i];       break; }
+        case INT_TYPE:    { received_args[i].int_   = (signed int)raw_arguments[i];         break; }
+        case ADDRESS_TYPE: { received_args[i].addr[0] = (uintptr_t)raw_arguments[i];        break; }
         default: { received_args[i].other = (void*)raw_arguments[i]; break; }
         }
     }
