@@ -192,7 +192,7 @@ byte_t* parse_array(FILE* file, size_t *length) {
         if (strncmp(tok.body, "0x", 2) == 0) // hex representation
             strtohex_or_error(tok.body + 2, array[len], { return NULL; });
         else
-            strtoul_or_error(tok.body, array[len], { return NULL; });
+            array[len] = strtoul_or_err(tok.body, { return NULL; });
         
         free(tok.body);
         ++len;
@@ -278,7 +278,7 @@ ExitStatus_t parse_rules_from_file(char* filename) {
                 free(tok.body);
             } else if (state == ST_EXPECT_ARGN && strncmp(tok.body, "arg", 3) == 0) {
                 state = ST_EXPECT_VALUE;
-                strtoul_or_error(tok.body + 3, index, {
+                index = (u_int32_t)strtoul_or_err(tok.body + 3, {
                     // error: misformatted argument number 
                     goto err;
                 });

@@ -169,62 +169,50 @@ ExitStatus_t set_rules_for_syscall_name(char* name, Syscall_argument arguments[]
 
 // TODO: implement native C types processing
         case ULLONG_TYPE:{
-            unsigned long long value = ULLONG_MAX;
-            strtoull_or_error(arguments[i].str, value, {
+            rules[i].ullong = strtoull_or_err(arguments[i].str, {
                 // probably wrong type was specified
                 continue;
             });
-            rules[i].ullong = value;
             free(arguments[i].str);
             break;
         }
         case LLONG_TYPE: {
-            long long value = LLONG_MAX;
-            strtoll_or_error(arguments[i].str, value, {
+            rules[i].llong = strtoll_or_err(arguments[i].str, {
                 // probably wrong type was specified
                 continue;
             });
-            rules[i].llong = value;
             free(arguments[i].str);
             break;
         }
         case ULONG_TYPE:{
-            unsigned long value = ULONG_MAX;
-            strtoul_or_error(arguments[i].str, value, {
+            rules[i].ulong = strtoul_or_err(arguments[i].str, {
                 // probably wrong type was specified
                 continue;
             });
-            rules[i].ulong = value;
             free(arguments[i].str);
             break;
         }
         case LONG_TYPE:{
-            long value = LONG_MAX;
-            strtol_or_error(arguments[i].str, value, {
+            rules[i].long_ = strtol_or_err(arguments[i].str, {
                 // probably wrong type was specified
                 continue;
             });
-            rules[i].long_ = value;
             free(arguments[i].str);
             break;
         }
         case UINT_TYPE: {
-            unsigned int value = UINT32_MAX;
-            strtoul_or_error(arguments[i].str, value, {
+            rules[i].uint = (unsigned int)strtoul_or_err(arguments[i].str, {
                 // probably wrong type was specified
                 continue;
             });
-            rules[i].uint = value;
             free(arguments[i].str);
             break;
         }
         case INT_TYPE: {
-            int value = INT32_MAX;
-            strtol_or_error(arguments[i].str, value, {
+            rules[i].int_ = (int)strtol_or_err(arguments[i].str, {
                 // probably wrong type was specified
                 continue;
             });
-            rules[i].int_ = value;
             free(arguments[i].str);
             break;
         }
