@@ -45,53 +45,50 @@ do {\
     } \
 } while(false)
 
-#define strtol_or_error(__str, __result, __on_error) \
-do {\
+#define strtol_or_err(__str, __on_error) ({\
+    const char* __local__str = (__str); \
     char* __endptr; \
-    int32_t __value = strtol(__str, &__endptr, 10); \
-    if ((errno == ERANGE && (__value == LONG_MAX || __value == LONG_MIN)) || __str == __endptr || *__endptr != '\0') {\
+    errno = 0; \
+    long __value = strtol(__local__str, &__endptr, 10); \
+    if ((errno == ERANGE && (__value == LONG_MAX || __value == LONG_MIN)) || __local__str == __endptr || *__endptr != '\0') {\
         __on_error \
     } \
-    else { \
-        __result = __value ; \
-    } \
-} while(false)
+    __value; \
+})
 
-#define strtoll_or_error(__str, __result, __on_error) \
-do {\
+#define strtoul_or_err(__str, __on_error) ({\
+    const char* __local__str = (__str); \
     char* __endptr; \
-    int64_t __value = strtoll(__str, &__endptr, 10); \
-    if ((errno == ERANGE && (__value == LLONG_MAX || __value == LLONG_MIN)) || __str == __endptr || *__endptr != '\0') {\
+    errno = 0; \
+    unsigned long __value = strtoul(__local__str, &__endptr, 10); \
+    if ((errno == ERANGE && (__value == LONG_MAX || __value == LONG_MIN)) || __local__str == __endptr || *__endptr != '\0') {\
         __on_error \
     } \
-    else { \
-        __result = __value ; \
-    } \
-} while(false)
+    __value; \
+})
 
-#define strtoull_or_error(__str, __result, __on_error) \
-do {\
+#define strtoll_or_err(__str, __on_error) ({\
+    const char* __local__str = (__str); \
     char* __endptr; \
-    u_int64_t __value = strtoull(__str, &__endptr, 10); \
-    if ((errno == ERANGE && (__value == ULLONG_MAX)) || __str == __endptr || *__endptr != '\0') {\
+    errno = 0; \
+    long long __value = strtoll(__local__str, &__endptr, 10); \
+    if ((errno == ERANGE && (__value == LONG_MAX || __value == LONG_MIN)) || __local__str == __endptr || *__endptr != '\0') {\
         __on_error \
     } \
-    else { \
-        __result = __value ; \
-    } \
-} while(false)
+    __value; \
+})
 
-#define strtoul_or_error(__str, __result, __on_error) \
-do {\
+#define strtoull_or_err(__str, __on_error) ({\
+    const char* __local__str = (__str); \
     char* __endptr; \
-    u_int32_t __value = strtoul(__str, &__endptr, 10); \
-    if ((errno == ERANGE && (__value == ULONG_MAX)) || __str == __endptr || *__endptr != '\0') {\
+    errno = 0; \
+    unsigned long long __value = strtol(__local__str, &__endptr, 10); \
+    if ((errno == ERANGE && (__value == LONG_MAX || __value == LONG_MIN)) || __local__str == __endptr || *__endptr != '\0') {\
         __on_error \
     } \
-    else { \
-        __result = __value ; \
-    } \
-} while(false)
+    __value; \
+})
+
 
 int check_regex(char* str, const char* pattern);
 

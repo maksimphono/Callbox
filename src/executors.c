@@ -182,8 +182,9 @@ ExitStatus_t execute_commands_workflow(Token_t* tokens, u_int32_t tokens_length,
             printf("Error with setting rules\n");
             return exit_status;
         }
-    else
+    else {
         print_empty_rules();
+    }
 
     if (cli_arguments->trace_output_file != NULL) {
         trace_output_fd = open(cli_arguments->trace_output_file, O_CREAT | O_WRONLY | O_TRUNC, 0644);

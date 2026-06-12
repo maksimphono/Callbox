@@ -53,11 +53,13 @@ void print_single_syscall_argument(int fd, Syscall_argument* arg){
     const char* fmt = syscall_args_print_formats[arg->type];
 
     switch (arg->type) {
-    case UINT_32_TYPE: { dprintf(fd, fmt, arg->uint32);  break; }
-    case UINT_64_TYPE: { dprintf(fd, fmt, arg->uint64);  break; }
-    case INT_64_TYPE:  { dprintf(fd, fmt, arg->int64);   break; }
-    case INT_32_TYPE:  { dprintf(fd, fmt, arg->int32);   break; }
-    case ADDRESS_TYPE: { dprintf(fd, fmt, arg->addr[0]); break; }
+    case UINT_TYPE:     { dprintf(fd, fmt, arg->uint);    break; }
+    case INT_TYPE:      { dprintf(fd, fmt, arg->int_);    break; }
+    case ULLONG_TYPE:   { dprintf(fd, fmt, arg->ullong);  break; }
+    case LLONG_TYPE:    { dprintf(fd, fmt, arg->llong);   break; }
+    case ULONG_TYPE:    { dprintf(fd, fmt, arg->ulong);   break; }
+    case LONG_TYPE:     { dprintf(fd, fmt, arg->long_);   break; }
+    case ADDRESS_TYPE:  { dprintf(fd, fmt, arg->addr[0]); break; }
     case STRING_TYPE:  { 
         dprintf(fd, "\"");
         for (size_t i = 0; arg->str[i] != '\0'; i++) {

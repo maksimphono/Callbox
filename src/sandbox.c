@@ -105,6 +105,7 @@ void record_syscall_with_rules(u_int32_t syscall_num) {
 // TODO: create custom handlers for special syscalls, that requires specific tracing strategy
 //       for example with variadic or strange array arguments
 
+
 // Will set rules for the syscall by provided name
 // arguments must be in exact order (argument 0, argument 1, argument 2...)
 ExitStatus_t set_rules_for_syscall_name(char* name, Syscall_argument arguments[], u_int32_t arguments_length, Action_type action) {
@@ -153,7 +154,7 @@ ExitStatus_t set_rules_for_syscall_name(char* name, Syscall_argument arguments[]
         case ___NONE_TYPE:
             // if argument wasn't specified -> just skip
             switch (arguments[i].type) {
-            case UINT_64_TYPE:
+            case ULLONG_TYPE:
             case STRING_TYPE: {
                 free(arguments[i].str);
                 break;
@@ -164,7 +165,7 @@ ExitStatus_t set_rules_for_syscall_name(char* name, Syscall_argument arguments[]
             continue;
         case ADDRESS_TYPE:
             // assuming address starts with "0x" (16-base int), starting scanning number from second position
-            if (arguments[i].type == UINT_64_TYPE) {
+            if (arguments[i].type == ULLONG_TYPE) {
                 rules[i].addr[0] = rules[i].addr[1] = (uintptr_t)strtoull(arguments[i].str, &endptr, 16);
             } else if (check_regex(arguments[i].str, "^0x[0-9a-fA-F]+-0x[0-9a-fA-F]+$") == 0) {
                 sscanf(arguments[i].str, "0x%llx-0x%llx", &rules[i].addr[0], &rules[i].addr[1]);
@@ -176,43 +177,53 @@ ExitStatus_t set_rules_for_syscall_name(char* name, Syscall_argument arguments[]
             }
             free(arguments[i].str);
             break;
-        case UINT_64_TYPE:{
-            u_int64_t value = ULLONG_MAX;
-            strtoull_or_error(arguments[i].str, value, {
+
+// TODO: implement native C types processing
+        case ULLONG_TYPE:{
+            rules[i].ullong = strtoull_or_err(arguments[i].str, {
                 // probably wrong type was specified
                 continue;
             });
-            rules[i].uint64 = value;
             free(arguments[i].str);
             break;
         }
-        case UINT_32_TYPE: {
-            u_int32_t value = ULONG_MAX;
-            strtoul_or_error(arguments[i].str, value, {
+        case LLONG_TYPE: {
+            rules[i].llong = strtoll_or_err(arguments[i].str, {
                 // probably wrong type was specified
                 continue;
             });
-            rules[i].uint32 = value;
             free(arguments[i].str);
             break;
         }
-        case INT_32_TYPE: {
-            int32_t value = LONG_MAX;
-            strtol_or_error(arguments[i].str, value, {
+        case ULONG_TYPE:{
+            rules[i].ulong = strtoul_or_err(arguments[i].str, {
                 // probably wrong type was specified
                 continue;
             });
-            rules[i].int32 = value;
             free(arguments[i].str);
             break;
         }
-        case INT_64_TYPE: {
-            int64_t value = LLONG_MAX;
-            strtoll_or_error(arguments[i].str, value, {
+        case LONG_TYPE:{
+            rules[i].long_ = strtol_or_err(arguments[i].str, {
                 // probably wrong type was specified
                 continue;
             });
-            rules[i].int64 = value;
+            free(arguments[i].str);
+            break;
+        }
+        case UINT_TYPE: {
+            rules[i].uint = (unsigned int)strtoul_or_err(arguments[i].str, {
+                // probably wrong type was specified
+                continue;
+            });
+            free(arguments[i].str);
+            break;
+        }
+        case INT_TYPE: {
+            rules[i].int_ = (int)strtol_or_err(arguments[i].str, {
+                // probably wrong type was specified
+                continue;
+            });
             free(arguments[i].str);
             break;
         }
@@ -250,20 +261,28 @@ ExitStatus_t set_rules_for_syscall_name(char* name, Syscall_argument arguments[]
         case ADDRESS_TYPE:
             printf("type: ADDRESS_TYPE, val = %llx-%llx\n", r[i].addr[0], r[i].addr[1]);
             break;
-        case UINT_64_TYPE:{
-            printf("type: UINT_64_TYPE, val = %llu\n", r[i].uint64);
+        case ULLONG_TYPE:{
+            printf("type: ULLONG_TYPE, val = %llu\n", r[i].ullong);
             break;
         }
-        case INT_64_TYPE: {
-            printf("type: INT_64_TYPE, val = %lld\n", r[i].int64);
+        case LLONG_TYPE: {
+            printf("type: LLONG_TYPE, val = %lld\n", r[i].llong);
             break;
         }
-        case UINT_32_TYPE: {
-            printf("type: UINT_32_TYPE, val = %u\n", r[i].uint32);
+        case ULONG_TYPE:{
+            printf("type: ULONG_TYPE, val = %llu\n", r[i].ulong);
             break;
         }
-        case INT_32_TYPE: {
-            printf("type: INT_32_TYPE, val = %d\n", r[i].int32);
+        case LONG_TYPE: {
+            printf("type: LONG_TYPE, val = %lld\n", r[i].long_);
+            break;
+        }
+        case UINT_TYPE: {
+            printf("type: UINT_TYPE, val = %u\n", r[i].uint);
+            break;
+        }
+        case INT_TYPE: {
+            printf("type: INT_TYPE, val = %d\n", r[i].int_);
             break;
         }
         case STRING_TYPE: {
@@ -288,21 +307,29 @@ bool cmp_syscall_argument(Syscall_argument* argument, Syscall_argument* received
     switch (argument->type) {
     case ADDRESS_TYPE:
         return (argument->addr[0] <= received_arg->addr[0] && argument->addr[1] >= received_arg->addr[0]);
-    case UINT_64_TYPE:{
-        printf("Comparing: %llu == %llu: %d", argument->uint64, received_arg->uint64, argument->uint64 == received_arg->uint64);
-        return argument->uint64 == received_arg->uint64;
+    case UINT_TYPE: {
+        printf("Comparing: %u == %u: %d", argument->uint, received_arg->uint, argument->uint == received_arg->uint);
+        return argument->uint == received_arg->uint;
     }
-    case UINT_32_TYPE: {
-        printf("Comparing: %u == %u: %d", argument->uint32, received_arg->uint32, argument->uint32 == received_arg->uint32);
-        return argument->uint32 == received_arg->uint32;
+    case INT_TYPE: {
+        printf("Comparing: %d == %d: %d", argument->int_, received_arg->int_, argument->int_ == received_arg->int_);
+        return argument->int_ == received_arg->int_;
     }
-    case INT_32_TYPE: {
-        printf("Comparing: %d == %d: %d", argument->int32, received_arg->int32, argument->int32 == received_arg->int32);
-        return argument->int32 == received_arg->int32;
+    case ULONG_TYPE:{
+        printf("Comparing: %llu == %llu: %d", argument->ulong, received_arg->ulong, argument->ulong == received_arg->ulong);
+        return argument->ulong == received_arg->ulong;
     }
-    case INT_64_TYPE: {
-        printf("Comparing: %lld == %lld: %d", argument->int64, received_arg->int64, argument->int64 == received_arg->int64);
-        return argument->int64 == received_arg->int64;
+    case LONG_TYPE: {
+        printf("Comparing: %lld == %lld: %d", argument->long_, received_arg->long_, argument->long_ == received_arg->long_);
+        return argument->long_ == received_arg->long_;
+    }
+    case ULLONG_TYPE:{
+        printf("Comparing: %llu == %llu: %d", argument->ullong, received_arg->ullong, argument->ullong == received_arg->ullong);
+        return argument->ullong == received_arg->ullong;
+    }
+    case LLONG_TYPE: {
+        printf("Comparing: %lld == %lld: %d", argument->llong, received_arg->llong, argument->llong == received_arg->llong);
+        return argument->llong == received_arg->llong;
     }
     case STRING_TYPE: {
         printf("Comparing: %s == %s: %d", argument->str, received_arg->str, strcmp(argument->str, received_arg->str));
@@ -464,46 +491,43 @@ Action_type print_blocked_syscall_arguments(reg_t syscall_num, pid_t pid, struct
     u_int8_t argument_num = 0;
     u_int8_t i = 0;
 
-    if (IS_SPECIAL(flags)) {
-        // special syscall, collect arguments using custom logic
-        argument_num = process_special_syscall(syscall_num, pid, raw_arguments, received_args);
-    } else {
-        // collect arguments in form of array of Syscall_argument
-        for (i = 0; types[i] != ___NONE_TYPE && i < MAX_SYSCALL_ARGS_NUM; i++) {
-            received_args[i].type = types[i];
-            switch (types[i]) {
-            case (STRING_TYPE): {
-                // read the string
-                received_args[i].str = read_str_from_tracee(pid, raw_arguments[i]);
-                //sprintf(received_args[i], syscall_args_print_formats[types[i]], buffer_c);
-                break;
-            }
-            case (ARRAY_TYPE): {
-                // in regular syscall assuming that the very next argument is a length
-                if (rules[i].type == STRING_TYPE) {
-                    // type array floats into type string if user specified so
-                    received_args[i].type = STRING_TYPE;
-                    received_args[i].str = read_str_from_tracee(pid, raw_arguments[i]);
-                    received_args[i].is_regex = rules[i].is_regex;
-                } else if (rules[i].type == ARRAY_TYPE || rules[i].type == ___NONE_TYPE) {
-                    received_args[i].arr_len = (size_t)raw_arguments[i + 1];
-                    received_args[i].arr = read_data_from_tracee(pid, raw_arguments[i], received_args[i].arr_len);
-                } else {
-                    // error: wrong argument type
-                    return NONE_ACTION;
-                }            
-                break;
-            }
-            case UINT_32_TYPE: { received_args[i].uint32  = (u_int32_t)raw_arguments[i];  break; }
-            case UINT_64_TYPE: { received_args[i].uint64  = (u_int64_t)raw_arguments[i];  break; }
-            case INT_32_TYPE:  { received_args[i].int32   = (int32_t)raw_arguments[i];    break; }
-            case INT_64_TYPE:  { received_args[i].int64   = (int64_t)raw_arguments[i];    break; }
-            case ADDRESS_TYPE: { received_args[i].addr[0] = (uintptr_t)raw_arguments[i];  break; }
-            default: { received_args[i].other = (void*)raw_arguments[i]; break; }
-            }
+    // collect arguments in form of array of Syscall_argument
+    for (i = 0; types[i] != ___NONE_TYPE && i < MAX_SYSCALL_ARGS_NUM; i++) {
+        received_args[i].type = types[i];
+        switch (types[i]) {
+        case (STRING_TYPE): {
+            // read the string
+            received_args[i].str = read_str_from_tracee(pid, raw_arguments[i]);
+            //sprintf(received_args[i], syscall_args_print_formats[types[i]], buffer_c);
+            break;
         }
-        argument_num = i;
+        case (ARRAY_TYPE): {
+            // in regular syscall assuming that the very next argument is a length
+            if (rules[i].type == STRING_TYPE) {
+                // type array floats into type string if user specified so
+                received_args[i].type = STRING_TYPE;
+                received_args[i].str = read_str_from_tracee(pid, raw_arguments[i]);
+                received_args[i].is_regex = rules[i].is_regex;
+            } else if (rules[i].type == ARRAY_TYPE || rules[i].type == ___NONE_TYPE) {
+                received_args[i].arr_len = (size_t)raw_arguments[i + 1];
+                received_args[i].arr = read_data_from_tracee(pid, raw_arguments[i], received_args[i].arr_len);
+            } else {
+                // error: wrong argument type
+                return NONE_ACTION;
+            }            
+            break;
+        }
+        case ULLONG_TYPE: { received_args[i].ullong = (unsigned long long)raw_arguments[i]; break; }
+        case LLONG_TYPE:  { received_args[i].llong  = (signed long long)raw_arguments[i];   break; }
+        case ULONG_TYPE:  { received_args[i].ulong  = (unsigned long)raw_arguments[i];      break; }
+        case LONG_TYPE:   { received_args[i].long_  = (signed long)raw_arguments[i];        break; }
+        case UINT_TYPE:   { received_args[i].uint   = (unsigned int)raw_arguments[i];       break; }
+        case INT_TYPE:    { received_args[i].int_   = (signed int)raw_arguments[i];         break; }
+        case ADDRESS_TYPE: { received_args[i].addr[0] = (uintptr_t)raw_arguments[i];        break; }
+        default: { received_args[i].other = (void*)raw_arguments[i]; break; }
+        }
     }
+    argument_num = i;
 
     for (i = 0; types[i] != ___NONE_TYPE && i < MAX_SYSCALL_ARGS_NUM; i++) {
         if (rules[i].type != ___NONE_TYPE && 
