@@ -6,6 +6,7 @@
 #include "../include/hashmap.h"
 #include "../include/syscalls_table.h"
 #include "../include/print_message.h"
+#include "../include/special_syscalls.h"
 
 Syscall_hashmap_t* syscalls_map;
 Node_recorded_rules_t* syscalls_with_rules = NULL;
@@ -427,56 +428,6 @@ err:
     free(data);
     return NULL;
 }
-
-u_int8_t process_syscall_open(pid_t pid, const reg_t raw_arguments[MAX_SYSCALL_ARGS_NUM], Syscall_argument received_args[MAX_SYSCALL_ARGS_NUM]) {
-    u_int8_t argument_num = 2;
-    received_args[0].type = STRING_TYPE;
-    received_args[0].str = read_str_from_tracee(pid, raw_arguments[0]);
-
-    received_args[1].type = INT_32_TYPE;
-    const int flags = received_args[1].int32 = (int)raw_arguments[1];
-
-    if (flags & O_CREAT || (flags & O_TMPFILE) == O_TMPFILE) {
-        // scanning mode argument
-        argument_num = 3;
-        received_args[2].type = UINT_32_TYPE;
-        received_args[2].uint32 = (u_int32_t)raw_arguments[2];
-    }
-
-    return argument_num;
-}
-
-u_int8_t process_syscall_openat(pid_t pid, const reg_t raw_arguments[MAX_SYSCALL_ARGS_NUM], Syscall_argument received_args[MAX_SYSCALL_ARGS_NUM]) {
-    u_int8_t argument_num = 3;
-    received_args[0].type = INT_32_TYPE;
-    received_args[0].int32 = (int32_t)raw_arguments[0];
-
-    received_args[1].type = STRING_TYPE;
-    received_args[1].str = read_str_from_tracee(pid, raw_arguments[1]);
-
-    received_args[2].type = INT_32_TYPE;
-    const int oflag = received_args[2].int32 = (int)raw_arguments[2];
-
-    if (oflag & O_CREAT || (oflag & O_TMPFILE) == O_TMPFILE) {
-        // scanning mode argument
-        argument_num = 4;
-        received_args[3].type = UINT_32_TYPE;
-        received_args[3].uint32 = (u_int32_t)raw_arguments[3];
-    }
-
-    return argument_num;
-}
-
-u_int8_t process_special_syscall(reg_t syscall_num, pid_t pid, const reg_t raw_arguments[MAX_SYSCALL_ARGS_NUM], Syscall_argument received_args[MAX_SYSCALL_ARGS_NUM]){
-    // dispatcher
-    switch (syscall_num) {
-    case SYSN_OPEN:
-        return process_syscall_open(pid, raw_arguments, received_args);
-    //case SYSN_OPENAT:
-    //    return process_syscall_openat(pid, raw_arguments, received_args);
-    }
-}
-
 
 // TODO: process empty string in the rules and in outputs
 Action_type print_blocked_syscall_arguments(reg_t syscall_num, pid_t pid, struct user_regs_struct regs, int trace_output_fd) {
