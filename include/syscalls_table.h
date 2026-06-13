@@ -3,26 +3,26 @@
 #include "sandbox.h"
 
 enum {
-    SYSN_OPEN          = 2,
-    SYSN_IOCTL         = 16,
-    SYSN_MREMAP        = 25,
-    SYSN_GETSOCKOPT    = 55,
-    SYSN_CLONE         = 56,
-    SYSN_EXECVE        = 59,
-    SYSN_SEMCTL        = 66,
-    SYSN_FCNTL         = 72,
-    SYSN_GETGROUPS     = 115,
-    SYSN_PRCTL         = 157,
-    SYSN_FUTEX         = 202,
-    SYSN_UTIMES        = 235,
-    SYSN_MBIND         = 237,
-    SYSN_GET_MEMPOLICY = 239,
-    SYSN_OPENAT        = 257,
-    SYSN_FUTIMESAT     = 261,
-    SYSN_MOVE_PAGES    = 279,
-    SYSN_PIPE2         = 293,
-    SYSN_EXECVEAT      = 322
-};
+    SYSN_OPEN          = 2,   // +
+    SYSN_IOCTL         = 16,  // +
+    SYSN_MREMAP        = 25,  //
+    SYSN_GETSOCKOPT    = 55,  //
+    SYSN_CLONE         = 56,  //
+    SYSN_EXECVE        = 59,  //
+    SYSN_SEMCTL        = 66,  //
+    SYSN_FCNTL         = 72,  //
+    SYSN_GETGROUPS     = 115, //
+    SYSN_PRCTL         = 157, //
+    SYSN_FUTEX         = 202, //
+    SYSN_UTIMES        = 235, //
+    SYSN_MBIND         = 237, //
+    SYSN_GET_MEMPOLICY = 239, //
+    SYSN_OPENAT        = 257, // +
+    SYSN_FUTIMESAT     = 261, //
+    SYSN_MOVE_PAGES    = 279, //
+    SYSN_PIPE2         = 293, //
+    SYSN_EXECVEAT      = 322  //
+ };
 
 Syscall_abstract syscalls_table[472] = {
 	{ 0  , { 'r', 'e', 'a', 'd', 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0 }, { INT_TYPE     , ARRAY_TYPE   , ULONG_TYPE   , ___NONE_TYPE , ___NONE_TYPE , ___NONE_TYPE },   0, NULL, NONE_ACTION },

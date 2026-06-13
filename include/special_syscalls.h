@@ -1,9 +1,43 @@
 #ifndef _SPECIAL_SYSCALLS_
 #define _SPECIAL_SYSCALLS_
 
+
+#include <sys/ioctl.h>
+
+
 #include "sandbox.h"
 #include "syscalls_table.h"
 
+
+#define I_POP 21251
+#define I_FLUSH 21253
+#define I_SETSIG 21257
+#define I_SRDOPT 21254
+#define I_SWROPT 21264
+#define I_SENDFD 21261
+#define I_ATMARK 21268
+#define I_CKBAND 21270
+#define I_CANPUT 21271
+#define I_LINK 21272
+#define I_UNLINK 21273
+#define I_PLINK 21274
+#define I_PUNLINK 21275
+#define I_GETCLTIME 21276
+#define I_SETCLTIME 21277
+#define I_GETBAND 21278
+#define I_GWROPT 21265
+#define I_NREAD 21249
+#define I_GRDOPT 21255
+#define I_GETSIG 21258
+#define I_PUSH 21250
+#define I_LOOK 21252
+#define I_FIND 21259
+#define I_PEEK 21260
+#define I_STR 21256
+#define I_FLUSHBAND 21263
+#define I_FDINSERT 21267
+#define I_RECVFD 21262
+#define I_LIST 21279
 
 #define DEFINE_SPECIAL_SYSCALL(__sys_name, __pid, __raw_arguments, __received_args, __body) \
 u_int8_t process_syscall_##__sys_name(pid_t __pid, const reg_t __raw_arguments[MAX_SYSCALL_ARGS_NUM], Syscall_argument __received_args[MAX_SYSCALL_ARGS_NUM]) { __body }
@@ -111,9 +145,7 @@ u_int8_t process_syscall_ioctl(pid_t pid, const reg_t raw_arguments[MAX_SYSCALL_
         received_args[2].addr[0] = received_args[2].addr[1] = (uintptr_t)raw_arguments[2];
         break;
     }
-})
-
-
+}
 
 u_int8_t process_special_syscall(reg_t syscall_num, pid_t pid, const reg_t raw_arguments[MAX_SYSCALL_ARGS_NUM], Syscall_argument received_args[MAX_SYSCALL_ARGS_NUM]){
     // dispatcher
