@@ -8,7 +8,7 @@
 #include "sandbox.h"
 #include "syscalls_table.h"
 
-
+// ioctl:
 #define I_POP 21251
 #define I_FLUSH 21253
 #define I_SETSIG 21257
@@ -38,6 +38,22 @@
 #define I_FDINSERT 21267
 #define I_RECVFD 21262
 #define I_LIST 21279
+
+// prctl:
+#define PR_SET_DUMPABLE	4
+#define PR_SET_KEEPCAPS	8
+#define PR_SET_PDEATHSIG 1
+#define PR_SET_NO_NEW_PRIVS	38
+#define PR_SET_CHILD_SUBREAPER 36
+#define PR_SET_NAME	15
+#define PR_GET_NAME	16
+#define PR_GET_PDEATHSIG 2
+#define PR_GET_CHILD_SUBREAPER	37
+#define PR_CAPBSET_READ 23
+#define PR_CAPBSET_DROP 24
+#define PR_SET_SPECULATION_CTRL 53
+#define PR_SET_SECCOMP 22
+
 
 #define DEFINE_SPECIAL_SYSCALL(__sys_name, __pid, __raw_arguments, __received_args, __body) \
 u_int8_t process_syscall_##__sys_name(pid_t __pid, const reg_t __raw_arguments[MAX_SYSCALL_ARGS_NUM], Syscall_argument __received_args[MAX_SYSCALL_ARGS_NUM]) { __body }
@@ -102,7 +118,7 @@ u_int8_t process_syscall_ioctl(pid_t pid, const reg_t raw_arguments[MAX_SYSCALL_
     case I_UNLINK:
     case I_PLINK:
     case I_PUNLINK:
-    // int    
+    // int
         received_args[2].type = INT_TYPE;
         received_args[2].int_ = (int)raw_arguments[2];
         break;
@@ -145,6 +161,67 @@ u_int8_t process_syscall_ioctl(pid_t pid, const reg_t raw_arguments[MAX_SYSCALL_
         received_args[2].addr[0] = received_args[2].addr[1] = (uintptr_t)raw_arguments[2];
         break;
     }
+    return 2;
+}
+
+
+u_int8_t process_syscall_prctl(pid_t pid, const reg_t raw_arguments[MAX_SYSCALL_ARGS_NUM], Syscall_argument received_args[MAX_SYSCALL_ARGS_NUM]) {
+    u_int32_t argument_num = 1;
+    received_args[0].type = INT_TYPE;
+    int op = received_args[0].int_ = (int)raw_arguments[0];
+
+    switch (op) {
+    case PR_SET_DUMPABLE:
+    case PR_SET_KEEPCAPS:
+    case PR_SET_PDEATHSIG:
+    case PR_SET_NO_NEW_PRIVS:
+    case PR_SET_CHILD_SUBREAPER:
+    case PR_CAPBSET_READ:
+    case PR_CAPBSET_DROP:    
+        // int
+        argument_num = 2;
+        received_args[1].type = INT_TYPE;
+        received_args[1].int_ = (int)raw_arguments[1];
+        break;
+    case PR_SET_NAME:
+    case PR_GET_NAME:
+        // str
+        argument_num = 2;
+        received_args[1].type = STRING_TYPE;
+        received_args[1].str = read_str_from_tracee(pid, raw_arguments[1]);
+        break;
+    case PR_GET_PDEATHSIG:
+    case PR_GET_CHILD_SUBREAPER: {
+        // int*
+        argument_num = 2;
+        byte_t* temp_arr;
+        size_t temp_len = 0;
+        temp_arr = read_data_from_tracee(pid, raw_arguments[1], sizeof(int)); // read a single int value by the specified address
+        received_args[1].type = INT_TYPE;
+        received_args[1].int_ = temp_arr[0];
+        free(temp_arr);
+        break;
+    }
+    case PR_SET_SPECULATION_CTRL:
+        argument_num = 3;
+        received_args[1].type = received_args[2].type = INT_TYPE;
+        received_args[1].int_ = (int)raw_arguments[1];
+        received_args[2].int_ = (int)raw_arguments[2];
+        break;
+    case PR_SET_SECCOMP:
+        argument_num = 3;    
+        received_args[1].type = INT_TYPE;
+        received_args[1].int_ = (int)raw_arguments[1];
+        received_args[2].type = ADDRESS_TYPE;
+        received_args[2].addr[0] = received_args[2].addr[1] = (uintptr_t)raw_arguments[2];
+        break;
+    }
+
+    return argument_num;
+}
+
+u_int8_t process_syscall_futex(pid_t pid, const reg_t raw_arguments[MAX_SYSCALL_ARGS_NUM], Syscall_argument received_args[MAX_SYSCALL_ARGS_NUM]) {
+
 }
 
 u_int8_t process_special_syscall(reg_t syscall_num, pid_t pid, const reg_t raw_arguments[MAX_SYSCALL_ARGS_NUM], Syscall_argument received_args[MAX_SYSCALL_ARGS_NUM]){
@@ -156,7 +233,11 @@ u_int8_t process_special_syscall(reg_t syscall_num, pid_t pid, const reg_t raw_a
     //    return process_syscall_openat(pid, raw_arguments, received_args);
     case SYSN_IOCTL:
         return process_syscall_ioctl(pid, raw_arguments, received_args);
-}
+    case SYSN_PRCTL:
+        return process_syscall_prctl(pid, raw_arguments, received_args);
+    case SYSN_FUTEX:
+        return process_syscall_futex(pid, raw_arguments, received_args);
+    }
 }
 
 #endif

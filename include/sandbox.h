@@ -65,7 +65,7 @@ typedef struct Syscall_abstract {
     u_int32_t number;
     const char name[SYSCALL_NAME_MAX_LEN];
     const Syscall_arg_type arg_types[MAX_SYSCALL_ARGS_NUM];
-    unsigned char flags;  // 7th bit -> is_special | none | none | none | none | none | none | none <- 0th bit
+    unsigned char flags;  // 7th bit -> is_special | not implemented | none | none | none | none | none | none <- 0th bit
     Syscall_argument* rules;
     Action_type action;
 } Syscall_abstract;
@@ -73,6 +73,7 @@ typedef struct Syscall_abstract {
 extern const Syscall_argument EMPTY_RULES;
 
 #define IS_SPECIAL(__flags) ((__flags & (flags8_t)128) == (flags8_t)128)
+#define IS_IMPLEMENTED(__flags) ((__flags & (flags8_t)64) != (flags8_t)64)
 #define RULE_IS_NONE(rule) (rule.type == ___NONE_TYPE)
 #define EMPTY_SYSCALL {0, {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}, {___NONE_TYPE,___NONE_TYPE,___NONE_TYPE,___NONE_TYPE,___NONE_TYPE,___NONE_TYPE}, 0, NULL,NONE_ACTION}
 #define IS_EMPTY_SYSCALL(syscall) (syscall.name[0] == 0)
