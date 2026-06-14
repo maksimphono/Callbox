@@ -9,50 +9,62 @@
 #include "syscalls_table.h"
 
 // ioctl:
-#define I_POP 21251
-#define I_FLUSH 21253
-#define I_SETSIG 21257
-#define I_SRDOPT 21254
-#define I_SWROPT 21264
-#define I_SENDFD 21261
-#define I_ATMARK 21268
-#define I_CKBAND 21270
-#define I_CANPUT 21271
-#define I_LINK 21272
-#define I_UNLINK 21273
-#define I_PLINK 21274
-#define I_PUNLINK 21275
+#define I_POP       21251
+#define I_FLUSH     21253
+#define I_SETSIG    21257
+#define I_SRDOPT    21254
+#define I_SWROPT    21264
+#define I_SENDFD    21261
+#define I_ATMARK    21268
+#define I_CKBAND    21270
+#define I_CANPUT    21271
+#define I_LINK      21272
+#define I_UNLINK    21273
+#define I_PLINK     21274
+#define I_PUNLINK   21275
 #define I_GETCLTIME 21276
 #define I_SETCLTIME 21277
-#define I_GETBAND 21278
-#define I_GWROPT 21265
-#define I_NREAD 21249
-#define I_GRDOPT 21255
-#define I_GETSIG 21258
-#define I_PUSH 21250
-#define I_LOOK 21252
-#define I_FIND 21259
-#define I_PEEK 21260
-#define I_STR 21256
+#define I_GETBAND   21278
+#define I_GWROPT    21265
+#define I_NREAD     21249
+#define I_GRDOPT    21255
+#define I_GETSIG    21258
+#define I_PUSH      21250
+#define I_LOOK      21252
+#define I_FIND      21259
+#define I_PEEK      21260
+#define I_STR       21256
 #define I_FLUSHBAND 21263
-#define I_FDINSERT 21267
-#define I_RECVFD 21262
-#define I_LIST 21279
+#define I_FDINSERT  21267
+#define I_RECVFD    21262
+#define I_LIST      21279
 
 // prctl:
-#define PR_SET_DUMPABLE	4
-#define PR_SET_KEEPCAPS	8
-#define PR_SET_PDEATHSIG 1
-#define PR_SET_NO_NEW_PRIVS	38
-#define PR_SET_CHILD_SUBREAPER 36
-#define PR_SET_NAME	15
-#define PR_GET_NAME	16
-#define PR_GET_PDEATHSIG 2
+#define PR_SET_DUMPABLE	        4
+#define PR_SET_KEEPCAPS	        8
+#define PR_SET_PDEATHSIG        1
+#define PR_SET_NO_NEW_PRIVS	    38
+#define PR_SET_CHILD_SUBREAPER  36
+#define PR_SET_NAME	            15
+#define PR_GET_NAME	            16
+#define PR_GET_PDEATHSIG        2
 #define PR_GET_CHILD_SUBREAPER	37
-#define PR_CAPBSET_READ 23
-#define PR_CAPBSET_DROP 24
+#define PR_CAPBSET_READ         23
+#define PR_CAPBSET_DROP         24
 #define PR_SET_SPECULATION_CTRL 53
-#define PR_SET_SECCOMP 22
+#define PR_SET_SECCOMP          22
+
+// futex:
+#define FUTEX_WAIT        0
+#define FUTEX_WAKE        1
+#define FUTEX_FD          2
+#define FUTEX_REQUEUE     3
+#define FUTEX_CMP_REQUEUE 4
+#define FUTEX_WAKE_OP     5
+#define FUTEX_WAIT_BITSET 9
+#define FUTEX_WAKE_BITSET 10
+#define FUTEX_PRIVATE_FLAG   128
+#define FUTEX_CLOCK_REALTIME 256
 
 
 #define DEFINE_SPECIAL_SYSCALL(__sys_name, __pid, __raw_arguments, __received_args, __body) \
@@ -134,7 +146,7 @@ u_int8_t process_syscall_ioctl(pid_t pid, const reg_t raw_arguments[MAX_SYSCALL_
         size_t temp_len = 0;
         temp_arr = read_data_from_tracee(pid, raw_arguments[2], sizeof(int)); // read a single int value by the specified address
         received_args[2].type = INT_TYPE;
-        received_args[2].int_ = temp_arr[0];
+        memcpy(&received_args[2].int_, temp_arr, sizeof(int));
         free(temp_arr);
         break;
     }
@@ -198,7 +210,7 @@ u_int8_t process_syscall_prctl(pid_t pid, const reg_t raw_arguments[MAX_SYSCALL_
         size_t temp_len = 0;
         temp_arr = read_data_from_tracee(pid, raw_arguments[1], sizeof(int)); // read a single int value by the specified address
         received_args[1].type = INT_TYPE;
-        received_args[1].int_ = temp_arr[0];
+        memcpy(&received_args[1].int_, temp_arr, sizeof(int));
         free(temp_arr);
         break;
     }
@@ -221,7 +233,81 @@ u_int8_t process_syscall_prctl(pid_t pid, const reg_t raw_arguments[MAX_SYSCALL_
 }
 
 u_int8_t process_syscall_futex(pid_t pid, const reg_t raw_arguments[MAX_SYSCALL_ARGS_NUM], Syscall_argument received_args[MAX_SYSCALL_ARGS_NUM]) {
+    uint8_t argument_num = 2;
+    byte_t* temp_arr;
+    size_t temp_len = 0;
+    temp_arr = read_data_from_tracee(pid, raw_arguments[0], sizeof(u_int32_t)); // read a single int value by the specified address
+    received_args[0].type = UINT_TYPE;
+    memcpy(&received_args[0].uint, temp_arr, sizeof(u_int32_t));
+    free(temp_arr);
 
+    received_args[1].type = INT_TYPE;
+    int op = received_args[1].int_ = (int)raw_arguments[1];
+    op = (op & ~FUTEX_PRIVATE_FLAG) & ~FUTEX_CLOCK_REALTIME; // turning off thses flags
+
+    switch (op) {
+    case FUTEX_WAIT:
+        argument_num = 4;
+        received_args[2].type = UINT_TYPE;
+        received_args[2].uint = (u_int32_t)raw_arguments[2];
+
+        received_args[3].type = ADDRESS_TYPE;
+        received_args[3].addr[0] = received_args[3].addr[1] = (uintptr_t)raw_arguments[3];
+        break;
+    case FUTEX_FD:
+    case FUTEX_WAKE:
+        argument_num = 3;
+        received_args[2].type = UINT_TYPE;
+        received_args[2].uint = (u_int32_t)raw_arguments[2];
+        break;
+    case FUTEX_REQUEUE:
+        argument_num = 5;
+        received_args[2].type = UINT_TYPE;
+        received_args[2].uint = (u_int32_t)raw_arguments[2];
+
+        received_args[3].type = UINT_TYPE;
+        received_args[3].uint = (u_int32_t)raw_arguments[3];
+
+        temp_arr = read_data_from_tracee(pid, raw_arguments[4], sizeof(u_int32_t)); // read a single int value by the specified address
+        received_args[4].type = UINT_TYPE;
+        memcpy(&received_args[4].uint, temp_arr, sizeof(u_int32_t));
+        free(temp_arr);
+        break;
+    case FUTEX_CMP_REQUEUE:
+    case FUTEX_WAKE_OP:
+        argument_num = 6;
+        received_args[2].type = UINT_TYPE;
+        received_args[2].uint = (u_int32_t)raw_arguments[2];
+
+        received_args[3].type = UINT_TYPE;
+        received_args[3].uint = (u_int32_t)raw_arguments[3];
+
+        temp_arr = read_data_from_tracee(pid, raw_arguments[4], sizeof(u_int32_t)); // read a single int value by the specified address
+        received_args[4].type = UINT_TYPE;
+        memcpy(&received_args[4].uint, temp_arr, sizeof(u_int32_t));
+        free(temp_arr);
+
+        received_args[5].type = UINT_TYPE;
+        received_args[5].uint = (u_int32_t)raw_arguments[5];
+        break;
+    case FUTEX_WAIT_BITSET:
+    case FUTEX_WAKE_BITSET:
+        argument_num = 6;
+        received_args[2].type = UINT_TYPE;
+        received_args[2].uint = (u_int32_t)raw_arguments[2];
+
+        received_args[3].type = ADDRESS_TYPE;
+        received_args[3].addr[0] = received_args[3].addr[1] = (uintptr_t)raw_arguments[3];
+
+        received_args[4].type = ADDRESS_TYPE;
+        received_args[4].addr[0] = received_args[4].addr[1] = (uintptr_t)NULL; // is NULL anyway according to man7.org
+
+        received_args[5].type = UINT_TYPE;
+        received_args[5].uint = (u_int32_t)raw_arguments[5];
+        break;
+    }
+
+    return argument_num;
 }
 
 u_int8_t process_special_syscall(reg_t syscall_num, pid_t pid, const reg_t raw_arguments[MAX_SYSCALL_ARGS_NUM], Syscall_argument received_args[MAX_SYSCALL_ARGS_NUM]){

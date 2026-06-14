@@ -10,7 +10,13 @@ Trace_result run_tracer(pid_t pid, pid_t group_id, int trace_output_fd) {
         return UNKNOWN_ERROR;
     }
 
-    ptrace_or_error(PTRACE_SETOPTIONS, pid, 0, PTRACE_O_TRACESYSGOOD);
+    long options = PTRACE_O_TRACESYSGOOD;
+                   //| PTRACE_O_TRACECLONE 
+                   //| PTRACE_O_TRACEFORK 
+                   //| PTRACE_O_TRACEVFORK 
+                   //| PTRACE_O_TRACEEXEC;
+
+    ptrace_or_error(PTRACE_SETOPTIONS, pid, 0, options);
 
     while (WIFSTOPPED(status) || WIFEXITED(status)) {
         struct user_regs_struct regs;

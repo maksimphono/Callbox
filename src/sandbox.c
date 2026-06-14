@@ -487,15 +487,16 @@ Action_type print_blocked_syscall_arguments(reg_t syscall_num, pid_t pid, struct
         argument_num = i;
     }
 
-    for (i = 0; types[i] != ___NONE_TYPE && i < MAX_SYSCALL_ARGS_NUM; i++) {
-        if (rules[i].type != ___NONE_TYPE && 
-            cmp_syscall_argument(&rules[i], &received_args[i]) == false
-        ) {
-            // arguments don't match -> do nothing
-            required_action = NONE_ACTION;
-            break;
+    if (rules != &EMPTY_RULES)
+        for (i = 0; types[i] != ___NONE_TYPE && i < MAX_SYSCALL_ARGS_NUM; i++) {
+            if (rules[i].type != ___NONE_TYPE && 
+                cmp_syscall_argument(&rules[i], &received_args[i]) == false
+            ) {
+                // arguments don't match -> do nothing
+                required_action = NONE_ACTION;
+                break;
+            }
         }
-    }
 
     switch (required_action) {
     case BLOCK:
