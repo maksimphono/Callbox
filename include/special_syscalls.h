@@ -69,6 +69,16 @@
 // mremap:
 #define MREMAP_FIXED 2
 
+// semctl:
+#define IPC_RMID 0
+#define IPC_SET  1
+#define IPC_STAT 2
+#define IPC_INFO 3
+#define GETALL   13
+#define SETVAL   16
+#define SETALL   17
+#define SEM_INFO 19
+
 
 #define DEFINE_SPECIAL_SYSCALL(__sys_name, __pid, __raw_arguments, __received_args, __body) \
 u_int8_t process_syscall_##__sys_name(pid_t __pid, const reg_t __raw_arguments[MAX_SYSCALL_ARGS_NUM], Syscall_argument __received_args[MAX_SYSCALL_ARGS_NUM]) { __body }
@@ -363,6 +373,40 @@ u_int8_t process_syscall_getsockopt(pid_t pid, const reg_t raw_arguments[MAX_SYS
     received_args[4].type = ADDRESS_TYPE;
     received_args[4].addr[0] = received_args[4].addr[1] = (uintptr_t)raw_arguments[4];
 
+    return argument_num;
+}
+
+u_int8_t process_syscall_semctl(pid_t pid, const reg_t raw_arguments[MAX_SYSCALL_ARGS_NUM], Syscall_argument received_args[MAX_SYSCALL_ARGS_NUM]) {
+    u_int8_t argument_num = 3;
+    received_args[0].type = INT_TYPE;
+    received_args[0].int_ = (int)raw_arguments[0];
+
+    received_args[1].type = INT_TYPE;
+    received_args[1].int_ = (int)raw_arguments[1];
+
+    received_args[2].type = INT_TYPE;
+    int op = received_args[2].int_ = (int)raw_arguments[2];
+
+    switch (op) {
+    case SETVAL:
+        // int
+        received_args[3].type = INT_TYPE;
+        received_args[3].int_ = (int)raw_arguments[3];
+        break;
+    case SEM_INFO:
+    case IPC_INFO:
+    case GETALL:
+    case SETALL:
+    case IPC_STAT:
+    case IPC_SET:
+        // addr
+        received_args[3].type = ADDRESS_TYPE;
+        received_args[3].addr[0] = received_args[3].addr[1] = (uintptr_t)raw_arguments[3];
+        break;
+    default: return argument_num;
+    }
+
+    argument_num = 4;
     return argument_num;
 }
 
