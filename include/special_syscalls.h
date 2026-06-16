@@ -495,13 +495,14 @@ u_int8_t process_syscall_fcntl(pid_t pid, const reg_t raw_arguments[MAX_SYSCALL_
     return argument_num;
 }
 
+
 u_int8_t process_special_syscall(reg_t syscall_num, pid_t pid, const reg_t raw_arguments[MAX_SYSCALL_ARGS_NUM], Syscall_argument received_args[MAX_SYSCALL_ARGS_NUM]){
     // dispatcher
     switch (syscall_num) {
     case SYSN_OPEN:
         return process_syscall_open(pid, raw_arguments, received_args);
-    //case SYSN_OPENAT:
-    //    return process_syscall_openat(pid, raw_arguments, received_args);
+    case SYSN_OPENAT:
+        return process_syscall_openat(pid, raw_arguments, received_args);
     case SYSN_IOCTL:
         return process_syscall_ioctl(pid, raw_arguments, received_args);
     case SYSN_PRCTL:
@@ -512,6 +513,10 @@ u_int8_t process_special_syscall(reg_t syscall_num, pid_t pid, const reg_t raw_a
         return process_syscall_mremap(pid, raw_arguments, received_args);    
     case SYSN_GETSOCKOPT:
         return process_syscall_getsockopt(pid, raw_arguments, received_args);
+    case SYSN_SEMCTL:
+        return process_syscall_semctl(pid, raw_arguments, received_args);
+    case SYSN_FCNTL:
+        return process_syscall_fcntl(pid, raw_arguments, received_args);
     }
 }
 

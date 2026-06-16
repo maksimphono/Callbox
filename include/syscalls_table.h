@@ -11,15 +11,16 @@ enum {
     SYSN_EXECVE        = 59,  // can't
     SYSN_SEMCTL        = 66,  // +
     SYSN_FCNTL         = 72,  // +
-    SYSN_GETGROUPS     = 115, //
+    SYSN_GETGROUPS     = 115, // can't
+	SYSN_SETGROUPS     = 116, // can't
     SYSN_PRCTL         = 157, // +
     SYSN_FUTEX         = 202, // tests needed
-    SYSN_UTIMES        = 235, //
-    SYSN_MBIND         = 237, //
-    SYSN_GET_MEMPOLICY = 239, //
+    SYSN_UTIMES        = 235, // can't
+    SYSN_MBIND         = 237, // can't
+    SYSN_GET_MEMPOLICY = 239, // can't
     SYSN_OPENAT        = 257, // +
-    SYSN_FUTIMESAT     = 261, //
-    SYSN_MOVE_PAGES    = 279, //
+    SYSN_FUTIMESAT     = 261, // no need 
+    SYSN_MOVE_PAGES    = 279, // can't
     SYSN_PIPE2         = 293, // can't
     SYSN_EXECVEAT      = 322  // can't
  };
@@ -141,7 +142,7 @@ Syscall_abstract syscalls_table[472] = {
 	{ 113, { 's', 'e', 't', 'r', 'e', 'u', 'i', 'd', 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0 }, { UINT_TYPE    , UINT_TYPE    , ___NONE_TYPE , ___NONE_TYPE , ___NONE_TYPE , ___NONE_TYPE },   0, NULL, NONE_ACTION },
 	{ 114, { 's', 'e', 't', 'r', 'e', 'g', 'i', 'd', 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0 }, { UINT_TYPE    , UINT_TYPE    , ___NONE_TYPE , ___NONE_TYPE , ___NONE_TYPE , ___NONE_TYPE },   0, NULL, NONE_ACTION },
 	{ 115, { 'g', 'e', 't', 'g', 'r', 'o', 'u', 'p', 's', 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0 }, { INT_TYPE     , ARRAY_TYPE   , ___NONE_TYPE , ___NONE_TYPE , ___NONE_TYPE , ___NONE_TYPE }, 192, NULL, NONE_ACTION },
-	{ 116, { 's', 'e', 't', 'g', 'r', 'o', 'u', 'p', 's', 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0 }, { ULONG_TYPE   , ADDRESS_TYPE , ___NONE_TYPE , ___NONE_TYPE , ___NONE_TYPE , ___NONE_TYPE },   0, NULL, NONE_ACTION },
+	{ 116, { 's', 'e', 't', 'g', 'r', 'o', 'u', 'p', 's', 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0 }, { ULONG_TYPE   , ADDRESS_TYPE , ___NONE_TYPE , ___NONE_TYPE , ___NONE_TYPE , ___NONE_TYPE }, 192, NULL, NONE_ACTION },
 	{ 117, { 's', 'e', 't', 'r', 'e', 's', 'u', 'i', 'd', 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0 }, { UINT_TYPE    , UINT_TYPE    , UINT_TYPE    , ___NONE_TYPE , ___NONE_TYPE , ___NONE_TYPE },   0, NULL, NONE_ACTION },
 	{ 118, { 'g', 'e', 't', 'r', 'e', 's', 'u', 'i', 'd', 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0 }, { ADDRESS_TYPE , ADDRESS_TYPE , ADDRESS_TYPE , ___NONE_TYPE , ___NONE_TYPE , ___NONE_TYPE },   0, NULL, NONE_ACTION },
 	{ 119, { 's', 'e', 't', 'r', 'e', 's', 'g', 'i', 'd', 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0 }, { UINT_TYPE    , UINT_TYPE    , UINT_TYPE    , ___NONE_TYPE , ___NONE_TYPE , ___NONE_TYPE },   0, NULL, NONE_ACTION },
