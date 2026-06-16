@@ -5,7 +5,7 @@
 enum {
     SYSN_OPEN          = 2,   // +
     SYSN_IOCTL         = 16,  // +
-    SYSN_MREMAP        = 25,  //
+    SYSN_MREMAP        = 25,  // in progress...
     SYSN_GETSOCKOPT    = 55,  //
     SYSN_CLONE         = 56,  // no need
     SYSN_EXECVE        = 59,  // can't

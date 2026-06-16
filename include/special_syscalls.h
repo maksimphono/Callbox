@@ -66,6 +66,9 @@
 #define FUTEX_PRIVATE_FLAG   128
 #define FUTEX_CLOCK_REALTIME 256
 
+// mremap:
+#define MREMAP_FIXED 2
+
 
 #define DEFINE_SPECIAL_SYSCALL(__sys_name, __pid, __raw_arguments, __received_args, __body) \
 u_int8_t process_syscall_##__sys_name(pid_t __pid, const reg_t __raw_arguments[MAX_SYSCALL_ARGS_NUM], Syscall_argument __received_args[MAX_SYSCALL_ARGS_NUM]) { __body }
@@ -305,6 +308,33 @@ u_int8_t process_syscall_futex(pid_t pid, const reg_t raw_arguments[MAX_SYSCALL_
         received_args[5].type = UINT_TYPE;
         received_args[5].uint = (u_int32_t)raw_arguments[5];
         break;
+    }
+
+    return argument_num;
+}
+
+//void *mremap(size_t old_size;
+//                    void old_address[old_size], size_t old_size,
+//                    size_t new_size, int flags, ...  /* void *new_address */);
+
+u_int8_t process_syscall_mremap(pid_t pid, const reg_t raw_arguments[MAX_SYSCALL_ARGS_NUM], Syscall_argument received_args[MAX_SYSCALL_ARGS_NUM]) {
+    u_int8_t argument_num = 4;
+    received_args[0].type = ADDRESS_TYPE;
+    received_args[0].addr[0] = received_args[0].addr[1] = (uintptr_t)raw_arguments[0];
+
+    received_args[1].type = ULONG_TYPE;
+    received_args[1].ulong = (unsigned long)raw_arguments[1];
+
+    received_args[2].type = ULONG_TYPE;
+    received_args[2].ulong = (unsigned long)raw_arguments[2];
+
+    received_args[3].type = INT_TYPE;
+    int flags = received_args[3].int_ = (int)raw_arguments[3];
+
+    if ((flags & MREMAP_FIXED) == MREMAP_FIXED) {
+        argument_num = 5;
+        received_args[4].type = ADDRESS_TYPE;
+        received_args[4].addr[0] = received_args[4].addr[1] = (uintptr_t)raw_arguments[4];
     }
 
     return argument_num;
