@@ -235,6 +235,7 @@ u_int8_t process_syscall_prctl(pid_t pid, const reg_t raw_arguments[MAX_SYSCALL_
     return argument_num;
 }
 
+// TODO: test tracing futex later (adjust main program to be able to trace futexes)
 u_int8_t process_syscall_futex(pid_t pid, const reg_t raw_arguments[MAX_SYSCALL_ARGS_NUM], Syscall_argument received_args[MAX_SYSCALL_ARGS_NUM]) {
     uint8_t argument_num = 2;
     byte_t* temp_arr;
@@ -313,10 +314,6 @@ u_int8_t process_syscall_futex(pid_t pid, const reg_t raw_arguments[MAX_SYSCALL_
     return argument_num;
 }
 
-//void *mremap(size_t old_size;
-//                    void old_address[old_size], size_t old_size,
-//                    size_t new_size, int flags, ...  /* void *new_address */);
-
 u_int8_t process_syscall_mremap(pid_t pid, const reg_t raw_arguments[MAX_SYSCALL_ARGS_NUM], Syscall_argument received_args[MAX_SYSCALL_ARGS_NUM]) {
     u_int8_t argument_num = 4;
     received_args[0].type = ADDRESS_TYPE;
@@ -340,6 +337,36 @@ u_int8_t process_syscall_mremap(pid_t pid, const reg_t raw_arguments[MAX_SYSCALL
     return argument_num;
 }
 
+u_int8_t process_syscall_getsockopt(pid_t pid, const reg_t raw_arguments[MAX_SYSCALL_ARGS_NUM], Syscall_argument received_args[MAX_SYSCALL_ARGS_NUM]) {
+    u_int8_t argument_num = 5;
+    byte_t *temp_arr = NULL;
+    received_args[0].type = INT_TYPE;
+    received_args[0].int_ = (int)raw_arguments[0];
+
+    received_args[1].type = INT_TYPE;
+    received_args[1].int_ = (int)raw_arguments[1];
+
+    received_args[2].type = INT_TYPE;
+    received_args[2].int_ = (int)raw_arguments[2];
+
+    // first getting the optlen by pointer
+    socklen_t optlen = 0;
+    temp_arr = read_data_from_tracee(pid, raw_arguments[4], sizeof(socklen_t)); // read a single int value by the specified address
+    memcpy(&optlen, temp_arr, sizeof(socklen_t));
+    free(temp_arr);
+
+    // then reading the array of optlen items in total
+    received_args[3].type = ARRAY_TYPE;
+    received_args[3].arr_len = (size_t)optlen;
+    received_args[3].arr = read_data_from_tracee(pid, raw_arguments[3], optlen);
+
+    received_args[4].type = ADDRESS_TYPE;
+    received_args[4].addr[0] = received_args[4].addr[1] = (uintptr_t)raw_arguments[4];
+
+    return argument_num;
+}
+
+
 u_int8_t process_special_syscall(reg_t syscall_num, pid_t pid, const reg_t raw_arguments[MAX_SYSCALL_ARGS_NUM], Syscall_argument received_args[MAX_SYSCALL_ARGS_NUM]){
     // dispatcher
     switch (syscall_num) {
@@ -353,6 +380,10 @@ u_int8_t process_special_syscall(reg_t syscall_num, pid_t pid, const reg_t raw_a
         return process_syscall_prctl(pid, raw_arguments, received_args);
     case SYSN_FUTEX:
         return process_syscall_futex(pid, raw_arguments, received_args);
+    case SYSN_MREMAP:
+        return process_syscall_mremap(pid, raw_arguments, received_args);    
+    case SYSN_GETSOCKOPT:
+        return process_syscall_getsockopt(pid, raw_arguments, received_args);
     }
 }
 

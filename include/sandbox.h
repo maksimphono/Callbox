@@ -38,6 +38,7 @@ typedef enum {
     NOTIFY // just notify about syscall being made with specific arguments, continue execution
 } Action_type;
 
+// TODO: keep the memory address and the value by that address, if it's a string, array or just value, referenced by address
 // Argument of a syscall, that will be stored in syscall rules list and define undesired argument type and it's value
 typedef struct Syscall_argument {
     Syscall_arg_type type;
