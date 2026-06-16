@@ -79,7 +79,46 @@
 #define SETALL   17
 #define SEM_INFO 19
 
+// fcntl:
+#define F_DUPFD              0
+#define F_GETFD              1
+#define F_SETFD              2
+#define F_GETFL              3
+#define F_SETFL              4
+#define F_SETOWN             8
+#define F_GETOWN             9
+#define F_SETSIG             10
+#define F_GETSIG             11
+#define F_SETLEASE           1024
+#define F_GETLEASE           1025
+#define F_NOTIFY             1026
+#define F_SETPIPE_SZ         1031
+#define F_GETPIPE_SZ         1032
+#define F_ADD_SEALS          1033
+#define F_GET_SEALS          1034
 
+#define F_GETLK              5
+#define F_SETLK              6
+#define F_SETLKW             7
+#define F_OFD_GETLK          36
+#define F_OFD_SETLK          37
+#define F_OFD_SETLKW         38
+#define F_SETOWN_EX          15
+#define F_GETOWN_EX          16
+
+#define F_SETDELEG           1035
+#define F_GETDELEG           1036
+#define F_SET_RW_HINT        1041
+#define F_GET_RW_HINT        1042
+#define F_SET_FILE_RW_HINT   1043
+#define F_GET_FILE_RW_HINT   1044
+
+
+#define AS_INT(__n) ({ \
+    received_args[__n].type = INT_TYPE; \
+    received_args[__n].int_ = (int)raw_arguments[__n]; \
+    received_args[__n].int_; \
+})
 #define DEFINE_SPECIAL_SYSCALL(__sys_name, __pid, __raw_arguments, __received_args, __body) \
 u_int8_t process_syscall_##__sys_name(pid_t __pid, const reg_t __raw_arguments[MAX_SYSCALL_ARGS_NUM], Syscall_argument __received_args[MAX_SYSCALL_ARGS_NUM]) { __body }
 
@@ -390,6 +429,7 @@ u_int8_t process_syscall_semctl(pid_t pid, const reg_t raw_arguments[MAX_SYSCALL
     switch (op) {
     case SETVAL:
         // int
+        argument_num = 4;
         received_args[3].type = INT_TYPE;
         received_args[3].int_ = (int)raw_arguments[3];
         break;
@@ -400,16 +440,60 @@ u_int8_t process_syscall_semctl(pid_t pid, const reg_t raw_arguments[MAX_SYSCALL
     case IPC_STAT:
     case IPC_SET:
         // addr
+        argument_num = 4;
         received_args[3].type = ADDRESS_TYPE;
         received_args[3].addr[0] = received_args[3].addr[1] = (uintptr_t)raw_arguments[3];
         break;
-    default: return argument_num;
     }
 
-    argument_num = 4;
     return argument_num;
 }
 
+u_int8_t process_syscall_fcntl(pid_t pid, const reg_t raw_arguments[MAX_SYSCALL_ARGS_NUM], Syscall_argument received_args[MAX_SYSCALL_ARGS_NUM]) {
+    u_int8_t argument_num = 2;
+    received_args[0].type = INT_TYPE;
+    received_args[0].int_ = (int)raw_arguments[0];
+
+    received_args[1].type = INT_TYPE;
+    int op = received_args[1].int_ = (int)raw_arguments[1];
+
+    switch (op) {
+    case F_ADD_SEALS:
+    case F_SETPIPE_SZ:
+    case F_NOTIFY:
+    case F_SETLEASE:
+    case F_SETSIG:
+    case F_SETOWN:
+    case F_SETFL:
+    case F_SETFD:
+    case F_DUPFD:
+    case F_DUPFD_CLOEXEC:
+        argument_num = 3;
+        received_args[2].type = INT_TYPE;
+        received_args[2].int_ = (int)raw_arguments[2];
+        break;
+    case F_GETLK:
+    case F_SETLK:
+    case F_SETLKW:
+    case F_OFD_GETLK:
+    case F_OFD_SETLK:
+    case F_OFD_SETLKW:
+    case F_GETOWN_EX:
+    case F_SETOWN_EX:
+    case F_SETDELEG:
+    case F_GETDELEG:
+    case F_SET_RW_HINT:
+    case F_GET_RW_HINT:
+    case F_GET_FILE_RW_HINT:
+    case F_SET_FILE_RW_HINT:
+        argument_num = 3;
+        received_args[2].type = ADDRESS_TYPE;
+        received_args[2].addr[0] = received_args[2].addr[1] = (uintptr_t)raw_arguments[2];
+        break;
+    }
+
+    return argument_num;
+}
 
 u_int8_t process_special_syscall(reg_t syscall_num, pid_t pid, const reg_t raw_arguments[MAX_SYSCALL_ARGS_NUM], Syscall_argument received_args[MAX_SYSCALL_ARGS_NUM]){
     // dispatcher
