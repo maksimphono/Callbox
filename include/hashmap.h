@@ -59,14 +59,16 @@ void del_Name##_entry(Name##_entry_t* this) {  \
 \
     Key_D(this->_key); \
     Val_D(this->_val); \
+\
     free(this); \
 }\
 
+#define EMPTY_F(...)
 
 void del_int(int n) {printf("Del: %d\n", n);}
 void del_char(char c) {printf("Del: %c\n", c);}
 
-DEFINE_HASHMAP(HMM, int, char,_,_,_,_,del_int,del_char)
+DEFINE_HASHMAP(HMM, int, char,_,_,_,_,EMPTY_F,del_char)
 
 /*
 size_t hash(char *str) {
@@ -143,7 +145,6 @@ void del_Hashmap_entry(Hashmap_entry_t* this);
 void insert_Syscall_hashmap(Syscall_hashmap_t* this, char* name, u_int32_t syscall_num);
 
 u_int32_t get_Syscall_hashmap(Syscall_hashmap_t* this, char* name);
-
 
 */
 #endif
