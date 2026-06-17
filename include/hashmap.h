@@ -3,6 +3,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
 
 #include "defs.h"
 
@@ -20,7 +21,8 @@
     Cmp_F,      /* key comparison function */ \
     Hash_F,     /* hash function */ \
     Key_D,      /* key destructor */ \
-    Val_D       /* value destructor */ \
+    Val_D,      /* value destructor */ \
+    Not_found_V /* if value wasn't found in the hashmap */ \
 ) \
     typedef struct Name##_entry_t { \
         Key_T _key; \
@@ -31,6 +33,7 @@
         Name##_entry_t** entries; \
         size_t size; \
     } Name##_hashmap_t;\
+    const Val_T Name##_hashmap_NOT_FOUND = (const Val_T)Not_found_V; \
 \
 Name##_hashmap_t* new_##Name##_hashmap(size_t size) { \
     Name##_hashmap_t* new_hashmap_instance = (Name##_hashmap_t*)malloc(sizeof(Name##_hashmap_t)); \
@@ -90,6 +93,23 @@ void insert_##Name##_hashmap(Name##_hashmap_t* this, Key_T key, Val_T val) { \
         this->entries[id] = new_##Name##_entry(key, val); \
     } \
 } \
+Val_T get_##Name##_hashmap(Name##_hashmap_t* this, Key_T key) { \
+    if (this == 0x0) return (Val_T)0x0; \
+\
+    size_t id = Hash_F(key) % this->size; \
+\
+    Name##_entry_t* current = this->entries[id]; \
+\
+    while (current != 0x0 && Cmp_F(current->_key, key) == 0) { \
+        current = current->next; \
+    } \
+\
+    if (current != 0x0) { \
+        return current->_val; \
+    } else { \
+        return Name##_hashmap_NOT_FOUND; \
+    } \
+} \
 
 #define EMPTY_F(...)
 
@@ -107,10 +127,11 @@ size_t hash(char *str) {
     return (size_t)hash;
 }
 
-#define STR_CPY(__dest, __src) (__dest = strdup(__src))
-#define ASSIGN(__dest, __src) (__dest = __src)
+#define STR_CPY(__dest, __src) __dest = strdup(__src)
+#define ASSIGN(__dest, __src) __dest = __src
+#define STR_CMP(__a, __b) (strcmp(__a, __b) == 0)
 
-DEFINE_HASHMAP(str_int, char*, int, STR_CPY, ASSIGN,_, hash,free,EMPTY_F)
+DEFINE_HASHMAP(str_int, char*, int, STR_CPY, ASSIGN, STR_CMP, hash,free,EMPTY_F, -99)
 
 int main() {
     str_int_hashmap_t* hm = new_str_int_hashmap(2);
