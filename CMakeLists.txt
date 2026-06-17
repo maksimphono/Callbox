@@ -11,7 +11,6 @@ add_executable(main
     src/readers.c
     src/sandbox.c
     src/utils.c
-    src/hashmap.c
     src/main.c
 )
 
@@ -29,7 +28,6 @@ add_executable(main_mem
     src/readers.c
     src/sandbox.c
     src/utils.c
-    src/hashmap.c
     src/main.c
 )
 

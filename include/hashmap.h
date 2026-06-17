@@ -152,23 +152,13 @@ Prefix void drop_##Name(Name* this, Key_T key) { \
     _DEFINE_GENERIC_HASHMAP(,Name,Hash_F,Key_T,Val_T,Cpy_key_F,Cpy_val_F,Cmp_F,Key_D,Val_D,Not_found_V)
 /* define static hashmap */
 #define DEFINE_STATIC_HASHMAP(Name, Hash_F,Key_T,Val_T,Cpy_key_F,Cpy_val_F,Cmp_F,Key_D,Val_D,Not_found_V) \
-    _DEFINE_GENERIC_HASHMAP(static, Name,Hash_F,Key_T,Val_T,Cpy_key_F,Cpy_val_F,Cmp_F,Key_D,Val_D,Not_found_V)
+    _DEFINE_GENERIC_HASHMAP(static inline, Name,Hash_F,Key_T,Val_T,Cpy_key_F,Cpy_val_F,Cmp_F,Key_D,Val_D,Not_found_V)
 /* define regular hashmap where key and values are simple types that don't need removal */ 
 #define DEFINE_SIMPLE_HASHMAP(Name,Key_T,Val_T,Not_found_V) \
     _DEFINE_GENERIC_HASHMAP(,Name,SIMPLE_HASH,Key_T,Val_T,ASSIGN,ASSIGN,SIMPLE_EQ,EMPTY_F,EMPTY_F,Not_found_V)
 /* same as above but static */ 
 #define DEFINE_SIMPLE_STATIC_HASHMAP(Name,Key_T,Val_T,Not_found_V) \
-    _DEFINE_GENERIC_HASHMAP(static,Name,SIMPLE_HASH,Key_T,Val_T,ASSIGN,ASSIGN,SIMPLE_EQ,EMPTY_F,EMPTY_F,Not_found_V)
+    _DEFINE_GENERIC_HASHMAP(static inline,Name,SIMPLE_HASH,Key_T,Val_T,ASSIGN,ASSIGN,SIMPLE_EQ,EMPTY_F,EMPTY_F,Not_found_V)
 
-size_t hash_str(char *str) {
-    u_int32_t hash = 5381;
-    int c;
-
-    while ((c = *str++)) {
-        hash = ((hash << 5) + hash) + c;
-    }
-
-    return (size_t)hash;
-}
 
 #endif

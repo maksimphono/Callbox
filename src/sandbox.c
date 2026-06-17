@@ -3,12 +3,32 @@
 #include <fcntl.h>
 
 #include "../include/sandbox.h"
-#include "../include/hashmap.h"
 #include "../include/syscalls_table.h"
 #include "../include/print_message.h"
 #include "../include/special_syscalls.h"
+#include "../include/hashmap.h"
 
-Syscall_hashmap_t* syscalls_map;
+static size_t hash_name(char *str) {
+    u_int32_t hash = 5381;
+    int c;
+
+    while ((c = *str++)) {
+        hash = ((hash << 5) + hash) + c;
+    }
+
+    return (size_t)hash;
+}
+
+DEFINE_HASHMAP(
+    Syscall_name_num_map, hash_name,
+    char*,      u_int32_t,
+    STR_CPY,    ASSIGN,
+    STR_CMP,
+    free,       EMPTY_F,
+    (char*)-1
+);
+
+const Syscall_name_num_map* syscalls_name_num_map;
 Node_recorded_rules_t* syscalls_with_rules = NULL;
 const Syscall_argument EMPTY_RULES = {___NONE_TYPE, 0};
 
@@ -34,12 +54,12 @@ const byte_t get_syscall_flags(reg_t syscall_num) {
 void init_syscall_rules() {
     //memset(&Syscall_rules, 0, NUMBER_OF_SYSCALLS * sizeof(char**));
     printf("init_syscall_rules\n");
-    syscalls_map = new_Syscall_hashmap(NUMBER_OF_SYSCALLS);
+    syscalls_name_num_map = new_Syscall_name_num_map(NUMBER_OF_SYSCALLS);
 
     // fill hashmap [syscall_name:syscall_number] with values
     for (u_int32_t i = 0; i < syscalls_table_len; i++) {
         if (not(IS_EMPTY_SYSCALL(syscalls_table[i]))) {
-            insert_Syscall_hashmap(syscalls_map, syscalls_table[i].name, syscalls_table[i].number);
+            set_Syscall_name_num_map(syscalls_name_num_map, syscalls_table[i].name, syscalls_table[i].number);
         }
     }
     return;
@@ -47,7 +67,7 @@ void init_syscall_rules() {
 
 void del_syscall_rules() {
     clean_syscall_rules();
-    del_Syscall_hashmap(syscalls_map);
+    del_Syscall_name_num_map(syscalls_name_num_map);
 }
 
 void clean_arguments(Syscall_argument* arguments) {
@@ -113,7 +133,7 @@ ExitStatus_t set_rules_for_syscall_name(char* name, Syscall_argument arguments[]
     Syscall_argument* rules = NULL;
     u_int32_t i = 0;
 
-    u_int32_t syscall_num = get_Syscall_hashmap(syscalls_map, name);
+    u_int32_t syscall_num = get_Syscall_name_num_map(syscalls_name_num_map, name);
     if (syscall_num == HM_NOT_FOUND || 
         IS_EMPTY_SYSCALL(syscalls_table[syscall_num])
     ) 
@@ -429,13 +449,13 @@ err:
     return NULL;
 }
 
+// TODO: add option to not scan and print arguments after tracing a syscall
 // TODO: process empty string in the rules and in outputs
 Action_type print_blocked_syscall_arguments(reg_t syscall_num, pid_t pid, struct user_regs_struct regs, int trace_output_fd) {
     const Syscall_arg_type* types = get_syscall_argument_types(syscall_num);
     const reg_t raw_arguments[MAX_SYSCALL_ARGS_NUM] = {regs.rdi, regs.rsi, regs.rdx, regs.r10, regs.r8, regs.r9};
     Syscall_argument received_args[MAX_SYSCALL_ARGS_NUM] = {EMPTY_RULES, EMPTY_RULES, EMPTY_RULES, EMPTY_RULES, EMPTY_RULES, EMPTY_RULES};
     Syscall_argument* rules = get_rules_for_syscall_id(syscall_num);
-    //const char* syscall_args_print_formats[] = {NULL, "%d", "%u", "%lld", "%llu", "\"%s\"", "0x%llx", "0x%llx", "0x%llx", "0x%llx"};
     Action_type required_action = syscalls_table[syscall_num].action; // entering this function automatically means, that syscall is assumed to be blocked
     flags8_t flags = get_syscall_flags(syscall_num);
 
