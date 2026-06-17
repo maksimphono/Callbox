@@ -1,6 +1,9 @@
 #ifndef _SYSCALL_HASHMAP_H_
 #define _SYSCALL_HASHMAP_H_
 
+#include <stdlib.h>
+#include <string.h>
+
 #include "defs.h"
 
 // TODO: implement universal hashmap using marcos, that can be used with any type
@@ -29,7 +32,7 @@
         size_t size; \
     } Name##_hashmap_t;\
 \
-Name##_hashmap_t* new_Name##_hashmap(size_t size) { \
+Name##_hashmap_t* new_##Name##_hashmap(size_t size) { \
     Name##_hashmap_t* new_hashmap_instance = (Name##_hashmap_t*)malloc(sizeof(Name##_hashmap_t)); \
     new_hashmap_instance->size = size; \
     new_hashmap_instance->entries = (Name##_entry_t**)malloc(size * sizeof(Name##_entry_t*)); \
@@ -37,7 +40,26 @@ Name##_hashmap_t* new_Name##_hashmap(size_t size) { \
     return new_hashmap_instance; \
 } \
 \
-void del_Name##_hashmap(Name##_hashmap_t* this) { \
+Name##_entry_t* new_##Name##_entry(Key_T key, Val_T val) { \
+    Name##_entry_t* new_instance = (Name##_entry_t*)malloc(sizeof(Name##_entry_t)); \
+    /* copying key and value (I assume these functions should B 2-argument macros) */ \
+    Cpy_key_F(new_instance->_key, key); \
+    Cpy_val_F(new_instance->_val, val); \
+\
+    new_instance->next = 0x0; \
+\
+    return new_instance; \
+} \
+void del_##Name##_entry(Name##_entry_t* this) {  \
+    if (this == 0x0) return; \
+\
+    /* Delete key and value using provided destructors (provide EMPTY_F if no destruction is needed) */ \
+    Key_D(this->_key); \
+    Val_D(this->_val); \
+\
+    free(this); \
+}\
+void del_##Name##_hashmap(Name##_hashmap_t* this) { \
     if (this == 0x0) return; \
 \
     Name##_entry_t* current = 0x0, *next = 0x0;\
@@ -46,7 +68,7 @@ void del_Name##_hashmap(Name##_hashmap_t* this) { \
         current = this->entries[i]; \
         while (current != 0x0) { \
             next = current->next; \
-            del_Name##_entry(current); \
+            del_##Name##_entry(current); \
             current = next; \
         } \
     } \
@@ -54,21 +76,51 @@ void del_Name##_hashmap(Name##_hashmap_t* this) { \
     free(this->entries); \
     free(this); \
 } \
-void del_Name##_entry(Name##_entry_t* this) {  \
+void insert_##Name##_hashmap(Name##_hashmap_t* this, Key_T key, Val_T val) { \
     if (this == 0x0) return; \
+    size_t id = Hash_F(key) % this->size; \
 \
-    Key_D(this->_key); \
-    Val_D(this->_val); \
+    Name##_entry_t* new_instance; \
 \
-    free(this); \
-}\
+    if (this->entries[id] != 0x0) { \
+        new_instance = new_##Name##_entry(key, val); \
+        new_instance->next = this->entries[id]; \
+        this->entries[id] = new_instance; \
+    } else { \
+        this->entries[id] = new_##Name##_entry(key, val); \
+    } \
+} \
 
 #define EMPTY_F(...)
 
-void del_int(int n) {printf("Del: %d\n", n);}
-void del_char(char c) {printf("Del: %c\n", c);}
+//void del_int(int n) {printf("Del: %d\n", n);}
+//void del_char(char c) {printf("Del: %c\n", c);}
 
-DEFINE_HASHMAP(HMM, int, char,_,_,_,_,EMPTY_F,del_char)
+size_t hash(char *str) {
+    u_int32_t hash = 5381;
+    int c;
+
+    while ((c = *str++)) {
+        hash = ((hash << 5) + hash) + c;
+    }
+
+    return (size_t)hash;
+}
+
+#define STR_CPY(__dest, __src) (__dest = strdup(__src))
+#define ASSIGN(__dest, __src) (__dest = __src)
+
+DEFINE_HASHMAP(str_int, char*, int, STR_CPY, ASSIGN,_, hash,free,EMPTY_F)
+
+int main() {
+    str_int_hashmap_t* hm = new_str_int_hashmap(2);
+    insert_str_int_hashmap(hm, "one", 1);
+    insert_str_int_hashmap(hm, "two", 2);
+    insert_str_int_hashmap(hm, "tree", 3);
+
+    del_str_int_hashmap(hm);
+    return 0;
+}
 
 /*
 size_t hash(char *str) {
