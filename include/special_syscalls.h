@@ -122,6 +122,7 @@
 #define DEFINE_SPECIAL_SYSCALL(__sys_name, __pid, __raw_arguments, __received_args, __body) \
 u_int8_t process_syscall_##__sys_name(pid_t __pid, const reg_t __raw_arguments[MAX_SYSCALL_ARGS_NUM], Syscall_argument __received_args[MAX_SYSCALL_ARGS_NUM]) { __body }
 
+// TODO: every time I read data from the tracee, check for error (retuls is NULL)
 
 DEFINE_SPECIAL_SYSCALL(open, pid, raw_arguments, received_args, {
     u_int8_t argument_num = 2;

@@ -382,6 +382,8 @@ byte_t* read_data_from_tracee(pid_t pid, reg_t addr, size_t length) {
     const size_t sizeof_word = sizeof(word);
     size_t bytes_read = 0;
     byte_t* data = (byte_t*)malloc(length * sizeof(byte_t));
+    if (data == NULL) 
+        goto err;
     size_t rem = length;
     size_t chunk_size = sizeof_word;
 
@@ -391,6 +393,7 @@ byte_t* read_data_from_tracee(pid_t pid, reg_t addr, size_t length) {
         if (word == -1 && errno != 0) {
             goto err;
         }
+        errno = 0;
 
         rem = length - bytes_read;
         chunk_size = (rem >= sizeof_word)? sizeof_word : rem;
@@ -403,7 +406,7 @@ byte_t* read_data_from_tracee(pid_t pid, reg_t addr, size_t length) {
     return data;
 
 err:
-    free(data);
+    if (data != NULL) free(data);
     return NULL;
 }
 
@@ -412,6 +415,8 @@ char* read_str_from_tracee(pid_t pid, reg_t addr) {
     const size_t sizeof_word = sizeof(word);
     const size_t default_len = 32;
     char* data = (char*)malloc(default_len * sizeof(char));
+    if (data == NULL) 
+        goto err;
     size_t bytes_read = 0;
     size_t capacity = default_len;
     size_t rem = default_len;
@@ -423,6 +428,7 @@ char* read_str_from_tracee(pid_t pid, reg_t addr) {
         if (word == -1 && errno != 0) {
             goto err;
         }
+        errno = 0;
 
         if (bytes_read + chunk_size > capacity) {
             // data won't fit -> resize buffer
@@ -445,11 +451,11 @@ char* read_str_from_tracee(pid_t pid, reg_t addr) {
     return data;
 
 err:
-    free(data);
+    if (data == NULL) free(data);
     return NULL;
 }
 
-// TODO: add option to not scan and print arguments after tracing a syscall
+// TODO: add option to "lazy" scan arguments, only scan those, that were specified in rules, if user wants to react to any argument value, do like this: arg1=*
 // TODO: process empty string in the rules and in outputs
 Action_type print_blocked_syscall_arguments(reg_t syscall_num, pid_t pid, struct user_regs_struct regs, int trace_output_fd) {
     const Syscall_arg_type* types = get_syscall_argument_types(syscall_num);
