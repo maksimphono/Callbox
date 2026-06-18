@@ -106,6 +106,20 @@ void reset_syscall_rules();
  
 byte_t* read_data_from_tracee(pid_t pid, reg_t addr, size_t length);
 
+#define read_word_from_tracee_or_err(pid, addr, __on_error) ({ \
+    long __local_word = 0; \
+    errno = 0; \
+    __local_word = ptrace(PTRACE_PEEKDATA, pid, (void*)addr, NULL); \
+    if (__local_word == -1 && errno != 0) { \
+        __on_error; \
+    } \
+    __local_word; \
+})
+
+// TODO: adapt this to 32-bit systems
+#define read_byte_from_tracee_or_err(pid, addr, __on_error) ({ (u_int8_t)(read_word_from_tracee_or_err(pid, addr, __on_error) & 0xff); })
+#define read_4_bytes_from_tracee_or_err(pid, addr, __on_error) ({ (u_int32_t)(read_word_from_tracee_or_err(pid, addr, __on_error) & 0xffffffff); })
+
 char* read_str_from_tracee(pid_t pid, reg_t addr);
 
 // Will set rules for the syscall by provided name

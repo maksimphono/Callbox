@@ -164,6 +164,7 @@ DEFINE_SPECIAL_SYSCALL(openat, pid, raw_arguments, received_args, {
 })
 
 u_int8_t process_syscall_ioctl(pid_t pid, const reg_t raw_arguments[MAX_SYSCALL_ARGS_NUM], Syscall_argument received_args[MAX_SYSCALL_ARGS_NUM]) {
+    u_int8_t argument_num = 2;
     received_args[0].type = INT_TYPE;
     received_args[0].int_ = (int)raw_arguments[0];
 
@@ -184,6 +185,7 @@ u_int8_t process_syscall_ioctl(pid_t pid, const reg_t raw_arguments[MAX_SYSCALL_
     case I_PLINK:
     case I_PUNLINK:
     // int
+        argument_num = 3;
         received_args[2].type = INT_TYPE;
         received_args[2].int_ = (int)raw_arguments[2];
         break;
@@ -195,24 +197,25 @@ u_int8_t process_syscall_ioctl(pid_t pid, const reg_t raw_arguments[MAX_SYSCALL_
     case I_GRDOPT:
     case I_GETSIG: 
     {   // int*
-        byte_t* temp_arr;
-        size_t temp_len = 0;
-        temp_arr = read_data_from_tracee(pid, raw_arguments[2], sizeof(int)); // read a single int value by the specified address
+        argument_num = 3;
         received_args[2].type = INT_TYPE;
-        memcpy(&received_args[2].int_, temp_arr, sizeof(int));
-        free(temp_arr);
+        received_args[2].int_ = (int)read_4_bytes_from_tracee_or_err(pid, raw_arguments[2], 
+            break
+        );
         break;
     }
     case I_PUSH:
     case I_LOOK:
     case I_FIND:
-        // str    
+        // str
+        argument_num = 3;
         received_args[2].type = STRING_TYPE;
         received_args[2].str = read_str_from_tracee(pid, raw_arguments[2]);
         break;
     
     case I_PEEK:
         // arr
+        argument_num = 3;
         received_args[2].type = ARRAY_TYPE;
         received_args[2].arr = read_data_from_tracee(pid, raw_arguments[2], received_args[2].arr_len);
         break;
@@ -222,6 +225,7 @@ u_int8_t process_syscall_ioctl(pid_t pid, const reg_t raw_arguments[MAX_SYSCALL_
     case I_RECVFD:
     case I_LIST:
         // addr
+        argument_num = 3;
         received_args[2].type = ADDRESS_TYPE;
         received_args[2].addr[0] = received_args[2].addr[1] = (uintptr_t)raw_arguments[2];
         break;
@@ -259,12 +263,10 @@ u_int8_t process_syscall_prctl(pid_t pid, const reg_t raw_arguments[MAX_SYSCALL_
     case PR_GET_CHILD_SUBREAPER: {
         // int*
         argument_num = 2;
-        byte_t* temp_arr;
-        size_t temp_len = 0;
-        temp_arr = read_data_from_tracee(pid, raw_arguments[1], sizeof(int)); // read a single int value by the specified address
         received_args[1].type = INT_TYPE;
-        memcpy(&received_args[1].int_, temp_arr, sizeof(int));
-        free(temp_arr);
+        received_args[1].int_ = (int)read_4_bytes_from_tracee_or_err(pid, raw_arguments[1], 
+            break;
+        );
         break;
     }
     case PR_SET_SPECULATION_CTRL:
@@ -288,12 +290,10 @@ u_int8_t process_syscall_prctl(pid_t pid, const reg_t raw_arguments[MAX_SYSCALL_
 // TODO: test tracing futex later (adjust main program to be able to trace futexes)
 u_int8_t process_syscall_futex(pid_t pid, const reg_t raw_arguments[MAX_SYSCALL_ARGS_NUM], Syscall_argument received_args[MAX_SYSCALL_ARGS_NUM]) {
     uint8_t argument_num = 2;
-    byte_t* temp_arr;
-    size_t temp_len = 0;
-    temp_arr = read_data_from_tracee(pid, raw_arguments[0], sizeof(u_int32_t)); // read a single int value by the specified address
     received_args[0].type = UINT_TYPE;
-    memcpy(&received_args[0].uint, temp_arr, sizeof(u_int32_t));
-    free(temp_arr);
+    received_args[0].uint = (unsigned int)read_4_bytes_from_tracee_or_err(pid, raw_arguments[0], 
+        return 0;
+    );
 
     received_args[1].type = INT_TYPE;
     int op = received_args[1].int_ = (int)raw_arguments[1];
@@ -322,10 +322,11 @@ u_int8_t process_syscall_futex(pid_t pid, const reg_t raw_arguments[MAX_SYSCALL_
         received_args[3].type = UINT_TYPE;
         received_args[3].uint = (u_int32_t)raw_arguments[3];
 
-        temp_arr = read_data_from_tracee(pid, raw_arguments[4], sizeof(u_int32_t)); // read a single int value by the specified address
         received_args[4].type = UINT_TYPE;
-        memcpy(&received_args[4].uint, temp_arr, sizeof(u_int32_t));
-        free(temp_arr);
+        received_args[4].uint = (unsigned int)read_4_bytes_from_tracee_or_err(pid, raw_arguments[4], 
+            received_args[4].uint = 0xffffffff;
+            break;
+        );
         break;
     case FUTEX_CMP_REQUEUE:
     case FUTEX_WAKE_OP:
@@ -336,10 +337,11 @@ u_int8_t process_syscall_futex(pid_t pid, const reg_t raw_arguments[MAX_SYSCALL_
         received_args[3].type = UINT_TYPE;
         received_args[3].uint = (u_int32_t)raw_arguments[3];
 
-        temp_arr = read_data_from_tracee(pid, raw_arguments[4], sizeof(u_int32_t)); // read a single int value by the specified address
         received_args[4].type = UINT_TYPE;
-        memcpy(&received_args[4].uint, temp_arr, sizeof(u_int32_t));
-        free(temp_arr);
+        received_args[4].uint = (unsigned int)read_4_bytes_from_tracee_or_err(pid, raw_arguments[4], 
+            received_args[4].uint = 0xffffffff;
+            break;
+        );
 
         received_args[5].type = UINT_TYPE;
         received_args[5].uint = (u_int32_t)raw_arguments[5];
@@ -400,10 +402,9 @@ u_int8_t process_syscall_getsockopt(pid_t pid, const reg_t raw_arguments[MAX_SYS
     received_args[2].int_ = (int)raw_arguments[2];
 
     // first getting the optlen by pointer
-    socklen_t optlen = 0;
-    temp_arr = read_data_from_tracee(pid, raw_arguments[4], sizeof(socklen_t)); // read a single int value by the specified address
-    memcpy(&optlen, temp_arr, sizeof(socklen_t));
-    free(temp_arr);
+    socklen_t optlen = (socklen_t)read_4_bytes_from_tracee_or_err(pid, raw_arguments[4], 
+        return 0;
+    );
 
     // then reading the array of optlen items in total
     received_args[3].type = ARRAY_TYPE;
